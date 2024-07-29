@@ -6,24 +6,24 @@ After cloning the respository, you can install the necessary python libraries us
 ```
 bash holography_pks
 ```
-User imput is needed to compelted the installation.
+User input is needed to compelted the installation. Please note that there may be some libraries that won't be installed so further manual installation of those may be required.
 
 # Main scripts to perform holgoraphy
 ## Rayleigh-Sommerfeld and Modified Propagation
-####positions_batch_multiprocess.py
+**positions_batch_multiprocess.py**  
 This script calculated the positions of cells from a holographic video recording.
 When the script is run, and interactive window is open to allow the user to select propagation method, and corresponding parameters. Export to CSV option is also included. You can find an alternative Juypter notebook (**positions_batch_multiprocess.ipynb**) for a more interactive experience.
 
 ### Gradient stack tool check
-####gradient_stack_check.py
+**gradient_stack_check.py**  
 This tool allows the user to interactively find the best threshold to filter propagation stack after applying Sobel-type filter. This should be run before running **positions_batch_multiprocess.py**. An alternative Jupyter notebook (**gradient_stack_check.ipynb**) is also present.
 
 ### Gradient stack tool check
-####gradient_stack_check_mod_prop.ipynb
+**gradient_stack_check_mod_prop.ipynb**  
 This tool allows the user to interactively find the best threshold to filter propagation stack after applying Sobel-type filter when using the modified propagator. This should be run before running **positions_batch_multiprocess.py**.
 
 ## 3D Tracking
-####make_tracks.py
+**make_tracks.py**  
 This script should be run after obaining the results from **positions_batch_multiprocess.py**. An alternative Jupyter notebook (**make_tracks.ipynb**) is also present.
 
 ## Helper Functions
