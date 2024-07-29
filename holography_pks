@@ -1,0 +1,21 @@
+#!/bin/bash
+
+conda upgrade conda
+python -m pip install opencv-python
+conda install -c anaconda cudatoolkit
+conda install -c bjornfjohansson mpldatacursor
+conda install -c conda-forge pysimplegui
+conda install -c anaconda numpy
+conda install -c anaconda scipy 
+conda install -c anaconda pandas 
+conda install -c conda-forge progress
+conda install -c conda-forge easygui 
+conda install -c plotly plotly_express 
+pip install -U csaps
+conda install -c conda-forge hdbscan 
+conda install -c anaconda natsort 
+conda install -c conda-forge cupy
+conda install -c conda-forge altair
+conda install -c conda-forge altair_viewer
+pip install streamlit
+echo Finished!
