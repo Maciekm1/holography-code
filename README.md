@@ -8,7 +8,7 @@ bash holography_pks
 ```
 User input is needed to compelted the installation. Please note that there may be some libraries that won't be installed so further manual installation of those may be required.
 
-# Main scripts to perform holgoraphy
+# Main scripts to perform holography
 ## Rayleigh-Sommerfeld and Modified Propagation
 **positions_batch_multiprocess.py**  
 This script calculated the positions of cells from a holographic video recording.
