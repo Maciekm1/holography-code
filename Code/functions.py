@@ -6,33 +6,32 @@ from cv2 import VideoWriter, VideoWriter_fourcc
 from scipy import ndimage
 from scipy.ndimage import median_filter
 
-# bandpassFilter
+
 def bandpassFilter(img, xs, xl):
-    ## Bandpass filter
-    # Input: img - Grayscale image array (2D)
-    #        xl  - Large cutoff size (Pixels)
-    #        xs  - Small cutoff size (Pixels)
-    # Output: img_filt - filtered image
+    """
+    Apply a bandpass filter to a grayscale image.
 
-    # FFT the grayscale image
-    imgfft = np.fft.fft2(img)
-    img_fft = np.fft.fftshift(imgfft)
+    Parameters:
+    ----------
+    img : np.ndarray
+        Grayscale image array (2D).
+    xs : float
+        Small cutoff size (Pixels).
+    xl : float
+        Large cutoff size (Pixels).
+
+    Returns:
+    -------
+    img_filt : np.ndarray
+        Filtered image.
+    BPP : np.ndarray
+        Bandpass filter array.
+    """
+    img_fft = np.fft.fftshift(np.fft.fft2(img))
     img_amp = abs(img_fft)
-    del imgfft
 
-    # Pre filter image information
-    [ni, nj] = img_amp.shape
+    ni, nj = img_amp.shape
     MIS = ni
-
-    # Create bandpass filter when BigAxis ==
-    # LCO = np.empty([ni, nj])
-    # SCO = np.empty([ni, nj])
-
-    # for ii in range(ni):
-    #     for jj in range(nj):
-    #         LCO[ii, jj] = np.exp(-((ii - MIS / 2) ** 2 + (jj - MIS / 2) ** 2) * (2 * xl / MIS) ** 2)
-    #         SCO[ii, jj] = np.exp(-((ii - MIS / 2) ** 2 + (jj - MIS / 2) ** 2) * (2 * xs / MIS) ** 2)
-    # BP = SCO - LCO
 
     jj, ii = np.meshgrid(np.arange(nj), np.arange(ni))
 
@@ -45,11 +44,10 @@ def bandpassFilter(img, xs, xl):
     filtered = BP * img_fft
     img_filt = np.fft.ifftshift(filtered)
     img_filt = np.fft.ifft2(img_filt)
-    # img_filt = np.rot90(np.real(img_filt),2)
 
     return img_filt, BPP
 
-# videoImport
+
 def videoImport(video, N):
     """
     Import video frames as a 3D array of grayscale images.
@@ -122,210 +120,6 @@ def videoImport(video, N):
 
     return imStack
 
-# exportAVI
-def exportAVI(filename, IM, NI, NJ, fps):
-    ## Export 3D array to .AVI movie file
-    #   Input:  IM - numpy 3D array
-    #           NI - number of rows of array
-    #           NJ - number of columns of array
-    #          fps - frames per second of output file
-    #   Output: .AVI file in working folder
-    dir = os.getcwd()
-    filenames = os.path.join(dir, filename)
-    FOURCC = VideoWriter_fourcc(*'MJPG')
-    VIDEO = VideoWriter(filenames, FOURCC, float(fps), (NJ, NI), 0)
-
-    for i in range(IM.shape[2]):
-        frame = IM[:, :, i]
-        frame = np.uint8(255 * frame / frame.max())
-        #    frame = np.random.randint(0, 255, (NI, NJ,3)).astype('uint8')
-        VIDEO.write(frame)
-
-    VIDEO.release()
-
-    print(filename, 'exported successfully')
-    return
-
-# rayleighSommerfeldPropagator
-def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter, bp_smallest_px=4,
-                                 bp_largest_px=60):
-    ## Rayleigh-Sommerfeld Back Propagator
-    #   Inputs:          I - hologram (grayscale)
-    #             I_MEDIAN - median image
-    #                    Z - numpy array defining defocusing distances
-    #   Output:        IMM - 3D array representing stack of images at different Z
-
-    # Divide by Median image
-    I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
-    IN = I / I_MEDIAN
-
-    if med_filter:
-        IN = median_filter(IN, size=1)
-
-    if bandpass:
-        _, BP = bandpassFilter(IN, bp_smallest_px, bp_largest_px)
-        E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
-    else:
-        E = np.fft.fftshift(np.fft.fft2(IN - 1))
-
-    # Patameters     #Set as input parameters
-    # N = 1.3226               # Index of refraction
-    LAMBDA = LAMBDA  # HeNe
-    FS = FS  # Sampling Frequency px/um
-    NI = np.shape(IN)[0]  # Number of rows
-    NJ = np.shape(IN)[1]  # Nymber of columns
-    # SZ = 10
-    Z = SZ * np.arange(0, NUMSTEPS)
-    # Z = (FS * (51 / 31)) * np.arange(0, NUMSTEPS)
-    #    Z = SZ*np.arange(0, NUMSTEPS)
-    K = 2 * np.pi * N / LAMBDA  # Wavenumber
-
-    # Rayleigh-Sommerfeld Arrays
-    # P = np.empty_like(I_MEDIAN, dtype='complex64')
-
-    # for i in range(NI):
-    #    for j in range(NJ):
-    #        P[i, j] = ((LAMBDA * FS) / (max([NI, NJ]) * N)) ** 2 * ((i - NI / 2) ** 2 + (j - NJ / 2) ** 2)
-
-    jj, ii = np.meshgrid(np.arange(NJ), np.arange(NI))
-    const = ((LAMBDA * FS) / (max([NI, NJ]) * N)) ** 2
-    P = const * ((ii - NI / 2) ** 2 + (jj - NJ / 2) ** 2)
-
-    if (P > 1).any():
-        P = P / P.max()
-
-    P = np.conj(P)
-    Q = np.sqrt(1 - P) - 1
-
-    if all(Z >= 0):
-        Q = np.conj(Q)
-
-    # R = np.empty([NI, NJ, Z.shape[0]], dtype=complex)
-    IZ = np.empty([NI, NJ, Z.shape[0]], dtype='float32')
-
-    for k in range(Z.shape[0]):
-        R = np.exp((-1j * K * Z[k] * Q), dtype='complex64')
-        IZ[:, :, k] = np.real(1 + np.fft.ifft2(np.fft.ifftshift(E * R)))
-    #        print(('RS', k))
-    return IZ
-
-
-# medianImage
-def medianImage(VID, numFrames):
-    ## Median Image
-    #   Input:   VID - 3D numpy array of video file
-    #            numFrames - Number of frames to calculat median image
-    #   Output: MEAN - 2D pixel mean array
-
-    def spaced_elements(array, numElems):
-        out = array[np.round(np.linspace(0, len(array) - 1, numElems)).astype(int)]
-        return out
-
-    N = np.shape(VID)[2]
-    id = spaced_elements(np.arange(N), numFrames)
-
-    # print('MI')
-    MEAN = np.median(VID[:, :, id], axis=2)
-
-    return MEAN
-
-
-# zGradientStack
-def zGradientStack(IM):
-    # Z-Gradient Stack
-    #   Inputs:   I - hologram (grayscale)
-    #            IM - median image
-    #             Z - numpy array defining defocusing distances
-    #   Output: CONV - 3D array representing stack of images at different Z
-
-    #    I = mpimg.imread('131118-1.png')
-    #    I_MEDIAN = mpimg.imread('AVG_131118-2.png')
-    #    Z = 0.02*np.arange(1, 151)
-    #     IM = rayleighSommerfeldPropagator(I, I_MEDIAN, Z)
-
-    # % Sobel-type kernel
-    SZ0 = np.array(([-1, -2, -1], [-2, -4, -2], [-1, -2, -1]), dtype='float')
-    SZ1 = np.zeros_like(SZ0)
-    SZ2 = -SZ0
-    SZ = np.stack((SZ0, SZ1, SZ2), axis=2)
-    del SZ0, SZ1, SZ2
-
-    # Convolution IM*SZ
-    # IM = IM ** 2
-    IMM = np.dstack((IM[:, :, 0][:, :, np.newaxis], IM, IM[:, :, -1][:, :, np.newaxis]))
-    GS = ndimage.convolve(IMM, SZ, mode='mirror')
-    GS = np.delete(GS, [0, np.shape(GS)[2] - 1], axis=2)
-    del IMM
-
-    #    exportAVI('gradientStack.avi',CONV, CONV.shape[0], CONV.shape[1], 24)
-    #    exportAVI('frameStack.avi', IM, IM.shape[0], IM.shape[1], 24)
-    return GS
-
-
-# modified_propagator
-def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter):
-    ## Modified Propagator
-    #   Inputs:          I - hologram (grayscale)
-    #             I_MEDIAN - median image
-    #                    Z - numpy array defining defocusing distances
-    #   Output:        GS - 3D Gradient Stack
-
-    # Divide by Median image
-    I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
-    IN = I / I_MEDIAN
-
-    if med_filter:
-        IN = median_filter(IN, size=1)
-
-    # Bandpass Filter
-    if bandpass:
-        _, BP = bandpassFilter(IN, 2, 30)
-        E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
-    else:
-        E = np.fft.fftshift(np.fft.fft2(IN - 1))
-
-    # Patameter
-    LAMBDA = LAMBDA  # HeNe
-    FS = FS  # Sampling Frequency px/um
-    NI = np.shape(IN)[0]  # Number of rows
-    NJ = np.shape(IN)[1]  # Nymber of columns
-    Z = SZ * np.arange(0, NUMSTEPS)
-    K = 2 * np.pi * N / LAMBDA  # Wavenumber
-
-    # Rayleigh-Sommerfeld Arrays
-    jj, ii = np.meshgrid(np.arange(NJ), np.arange(NI))
-    const = ((LAMBDA * FS) / (max([NI, NJ]) * N)) ** 2
-    q = (ii - NI / 2) ** 2 + (jj - NJ / 2) ** 2
-
-    # const = ((LAMBDA*FS)/(max([NI, NJ])*N))**2
-    # ff = np.fft.fftfreq(NI, FS)
-    # ff = ff**2+ff**2
-    # P = const*ff
-
-    P = const * q
-
-    if (P > 1).any():
-        P = P / P.max()
-
-    P = np.conj(P)
-    Q = np.sqrt(1 - P) - 1
-
-    if all(Z > 0):
-        Q = np.conj(Q)
-
-    GS = np.empty([NI, NJ, Z.shape[0]], dtype='float32')
-
-    for k in range(Z.shape[0]):
-        R = 2 * np.pi * 1j * q * np.exp(1j * K * Z[k] * Q)
-        # GS[:, :, k] = np.abs(1 + np.fft.ifft2(np.fft.ifftshift(E*R)))
-        GS[:, :, k] = np.real(1 + np.fft.ifft2(np.fft.ifftshift(E * R)))
-
-    # _, BINS = np.histogram(GS.flatten(), bins=100)
-    # GS[GS < BINS[60]] = 0   # 60
-    # GS[GS < 400] = 0
-
-    return GS
-
 
 def bgPathToArray(image_path):
     """
@@ -360,8 +154,256 @@ def bgPathToArray(image_path):
     return image_u8
 
 
-# Positions batch
+def exportAvi(filename, IM, NI, NJ, fps):
+    """
+    Export a 3D array to a .AVI movie file.
+
+    Parameters:
+    ----------
+    filename : str
+        Name of the output .AVI file.
+    IM : np.ndarray
+        3D numpy array containing image data.
+    NI : int
+        Number of rows of the array.
+    NJ : int
+        Number of columns of the array.
+    fps : int
+        Frames per second of output file.
+    """
+    dir = os.getcwd()
+    file_path = os.path.join(dir, filename)
+    fourcc = VideoWriter_fourcc(*'MJPG')
+    video = VideoWriter(file_path, fourcc, float(fps), (NJ, NI), 0)
+
+    for i in range(IM.shape[2]):
+        frame = IM[:, :, i]
+        frame = np.uint8(255 * frame / frame.max())
+        video.write(frame)
+
+    video.release()
+    print(f"{filename} exported successfully")
+
+
+def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter,
+                                    bp_smallest_px=4, bp_largest_px=60):
+    """
+    Rayleigh-Sommerfeld Back Propagator.
+
+    Parameters:
+    ----------
+    I : np.ndarray
+        Hologram (grayscale).
+    I_MEDIAN : np.ndarray
+        Median image.
+    N : float
+        Index of refraction.
+    LAMBDA : float
+        Wavelength.
+    FS : float
+        Sampling Frequency px/um.
+    SZ : float
+        Step size.
+    NUMSTEPS : int
+        Number of steps in propagation.
+    bandpass : bool
+        Whether to apply bandpass filtering.
+    med_filter : bool
+        Whether to apply median filtering.
+
+    Returns:
+    -------
+    IZ : np.ndarray
+        3D array representing stack of images at different Z.
+    """
+    I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
+    IN = I / I_MEDIAN
+
+    if med_filter:
+        IN = median_filter(IN, size=1)
+
+    if bandpass:
+        _, BP = bandpassFilter(IN, bp_smallest_px, bp_largest_px)
+        E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
+    else:
+        E = np.fft.fftshift(np.fft.fft2(IN - 1))
+
+    LAMBDA = LAMBDA
+    FS = FS
+    NI, NJ = IN.shape
+    Z = SZ * np.arange(0, NUMSTEPS)
+    K = 2 * np.pi * N / LAMBDA  # Wavenumber
+
+    jj, ii = np.meshgrid(np.arange(NJ), np.arange(NI))
+    const = ((LAMBDA * FS) / (max(NI, NJ) * N)) ** 2
+    P = const * ((ii - NI / 2) ** 2 + (jj - NJ / 2) ** 2)
+
+    if (P > 1).any():
+        P = P / P.max()
+
+    P = np.conj(P)
+    Q = np.sqrt(1 - P) - 1
+
+    if all(Z >= 0):
+        Q = np.conj(Q)
+
+    IZ = np.empty([NI, NJ, Z.shape[0]], dtype='float32')
+
+    for k in range(Z.shape[0]):
+        R = np.exp((-1j * K * Z[k] * Q), dtype='complex64')
+        IZ[:, :, k] = np.real(1 + np.fft.ifft2(np.fft.ifftshift(E * R)))
+
+    return IZ
+
+def medianImage(VID, num_frames):
+    """
+    Calculate the median image from a 3D numpy array of video frames.
+
+    Parameters:
+    ----------
+    VID : np.ndarray
+        3D numpy array of video file.
+    num_frames : int
+        Number of frames to calculate the median image.
+
+    Returns:
+    -------
+    MEAN : np.ndarray
+        2D pixel mean array.
+    """
+    def spaced_elements(array, num_elems):
+        return array[np.round(np.linspace(0, len(array) - 1, num_elems)).astype(int)]
+
+    N = VID.shape[2]
+    id = spaced_elements(np.arange(N), num_frames)
+    MEAN = np.median(VID[:, :, id], axis=2)
+
+    return MEAN
+
+
+def zGradientStack(IM):
+    """
+    Calculate the Z-gradient stack of an image.
+
+    Parameters:
+    ----------
+    IM : np.ndarray
+        Input image array.
+
+    Returns:
+    -------
+    GS : np.ndarray
+        3D array representing the gradient stack.
+    """
+    SZ0 = np.array([[-1, -2, -1], [-2, -4, -2], [-1, -2, -1]], dtype='float')
+    SZ1 = np.zeros_like(SZ0)
+    SZ2 = -SZ0
+    SZ = np.stack((SZ0, SZ1, SZ2), axis=2)
+
+    IMM = np.dstack((IM[:, :, 0][:, :, np.newaxis], IM, IM[:, :, -1][:, :, np.newaxis]))
+    GS = ndimage.convolve(IMM, SZ, mode='mirror')
+    GS = np.delete(GS, [0, GS.shape[2] - 1], axis=2)
+
+    return GS
+
+
+def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter):
+    """
+    Modified Propagator.
+
+    Parameters:
+    ----------
+    I : np.ndarray
+        Hologram (grayscale).
+    I_MEDIAN : np.ndarray
+        Median image.
+    N : float
+        Index of refraction.
+    LAMBDA : float
+        Wavelength.
+    FS : float
+        Sampling Frequency in px/um.
+    SZ : float
+        Step size.
+    NUMSTEPS : int
+        Number of steps in propagation.
+    bandpass : bool
+        Whether to apply bandpass filtering.
+    med_filter : bool
+        Whether to apply median filtering.
+
+    Returns:
+    -------
+    GS : np.ndarray
+        3D Gradient Stack.
+    """
+    # Divide by Median image
+    I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
+    IN = I / I_MEDIAN
+
+    if med_filter:
+        IN = median_filter(IN, size=1)
+
+    # Bandpass Filter
+    if bandpass:
+        _, BP = bandpassFilter(IN, 2, 30)
+        E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
+    else:
+        E = np.fft.fftshift(np.fft.fft2(IN - 1))
+
+    # Parameters
+    NI, NJ = IN.shape  # Number of rows and columns
+    Z = SZ * np.arange(NUMSTEPS)
+    K = 2 * np.pi * N / LAMBDA  # Wavenumber
+
+    # Rayleigh-Sommerfeld Arrays
+    jj, ii = np.meshgrid(np.arange(NJ), np.arange(NI))
+    const = ((LAMBDA * FS) / (max(NI, NJ) * N)) ** 2
+    q = (ii - NI / 2) ** 2 + (jj - NJ / 2) ** 2
+
+    P = const * q
+
+    if (P > 1).any():
+        P /= P.max()
+
+    P = np.conj(P)
+    Q = np.sqrt(1 - P) - 1
+
+    if all(Z > 0):
+        Q = np.conj(Q)
+
+    GS = np.empty((NI, NJ, Z.shape[0]), dtype='float32')
+
+    for k in range(Z.shape[0]):
+        R = 2 * np.pi * 1j * q * np.exp(1j * K * Z[k] * Q)
+        GS[:, :, k] = np.real(1 + np.fft.ifft2(np.fft.ifftshift(E * R)))
+
+    return GS
+
+
 def positions_batch(TUPLE):
+    """
+    Process a batch of positions from the input tuple.
+
+    Parameters:
+    ----------
+    TUPLE : tuple
+        A tuple containing the following elements:
+        - I (np.ndarray): Hologram.
+        - I_MEDIAN (np.ndarray): Median image.
+        - N (float): Index of refraction.
+        - LAMBDA (float): Wavelength.
+        - MPP (float): Microns per pixel.
+        - SZ (float): Step size.
+        - NUMSTEPS (int): Number of steps in propagation.
+        - THRESHOLD (float): Threshold for GS.
+        - PMD (float): Peak minimum distance.
+
+    Returns:
+    -------
+    list
+        A list containing the X, Y, Z positions and intensity arrays (I_FS, I_GS).
+    """
     I = TUPLE[0]
     I_MEDIAN = TUPLE[1]
     N = TUPLE[2]
@@ -375,12 +417,14 @@ def positions_batch(TUPLE):
 
     LOCS = np.empty((1, 3), dtype=object)
     X, Y, Z, I_FS, I_GS = [], [], [], [], []
+
     IM = rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, False).astype('float32')
     GS = zGradientStack(IM).astype('float32')
-    # GS = f.modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS)  # Modified propagator
+
     GS[GS < THRESHOLD] = 0
     LOCS[0, 0] = positions3D(GS, peak_min_distance=PMD, num_particles='None', MPP=MPP)
     A = LOCS[0, 0].astype('int')
+
     LOCS[0, 1] = IM[A[:, 0], A[:, 1], A[:, 2]]
     LOCS[0, 2] = GS[A[:, 0], A[:, 1], A[:, 2]]
 
@@ -393,8 +437,29 @@ def positions_batch(TUPLE):
     return [X, Y, Z, I_FS, I_GS]
 
 
-# Positions batch modified
 def positions_batch_modified(TUPLE):
+    """
+    Process a modified batch of positions from the input tuple.
+
+    Parameters:
+    ----------
+    TUPLE : tuple
+        A tuple containing the following elements:
+        - I (np.ndarray): Hologram.
+        - I_MEDIAN (np.ndarray): Median image.
+        - N (float): Index of refraction.
+        - LAMBDA (float): Wavelength.
+        - MPP (float): Microns per pixel.
+        - SZ (float): Size parameter.
+        - NUMSTEPS (int): Number of steps in propagation.
+        - THRESHOLD (float): Threshold for GS.
+        - PMD (float): Peak minimum distance.
+
+    Returns:
+    -------
+    list
+        A list containing the X, Y, Z positions and intensity arrays (I_FS, I_GS).
+    """
     I = TUPLE[0]
     I_MEDIAN = TUPLE[1]
     N = TUPLE[2]
@@ -411,12 +476,13 @@ def positions_batch_modified(TUPLE):
 
     LOCS = np.empty((1, 3), dtype=object)
     X, Y, Z, I_FS, I_GS = [], [], [], [], []
-    # IM = f.rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, False).astype('float32')
-    # GS = f.zGradientStack(IM).astype('float32')  
-    GS = modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, True)  # Modified propagator
+
+    GS = modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, True)
     GS[GS < THRESHOLD] = 0
+
     LOCS[0, 0] = positions3D(GS, peak_min_distance=PMD, num_particles='None', MPP=MPP)
     A = LOCS[0, 0].astype('int')
+
     LOCS[0, 1] = GS[A[:, 0], A[:, 1], A[:, 2]]
     LOCS[0, 2] = GS[A[:, 0], A[:, 1], A[:, 2]]
 
@@ -429,35 +495,51 @@ def positions_batch_modified(TUPLE):
     return [X, Y, Z, I_FS, I_GS]
 
 
-# Particles positions in 3D
 def positions3D(GS, peak_min_distance, num_particles, MPP):
+    """
+    Find the 3D positions of particles in the gradient stack.
+
+    Parameters:
+    ----------
+    GS : np.ndarray
+        3D Gradient Stack.
+    peak_min_distance : float
+        Minimum distance between peaks.
+    num_particles : int or str
+        Number of particles to detect; 'None' for no limit.
+    MPP : float
+        Microns per pixel.
+
+    Returns:
+    -------
+    np.ndarray
+        2D array with particle positions (x, y in pixels, z in slice number).
+    """
     ZP = np.max(GS, axis=-1)
+
     if num_particles == 'None':
-        PKS = peak_local_max(ZP, min_distance=peak_min_distance)  # 30
+        PKS = peak_local_max(ZP, min_distance=peak_min_distance)
     elif num_particles > 0:
         PKS = peak_local_max(ZP, min_distance=peak_min_distance, num_peaks=num_particles)
-
-    # import matplotlib.pyplot as plt
-    # plt.imshow(ZP, cmap='gray')
-    # plt.scatter(PKS[:,1], PKS[:,0], marker='o', facecolors='none', s=80, edgecolors='r')
-    # plt.show()
 
     D1 = int(MPP / 10)
     D2 = int(MPP / 10)
     Z_SUM_XY = np.empty((GS.shape[2], len(PKS)))
+
     for ii in range(len(PKS)):
-        idi = PKS[ii, 0]
-        idj = PKS[ii, 1]
-        A = GS[idi - D1:idi + D2:, idj - D1:idj + D2, :]  # How to treat borders?
+        idi, idj = PKS[ii]
+        A = GS[idi - D1:idi + D2, idj - D1:idj + D2, :]
         Z_SUM_XY[:, ii] = np.sum(A, axis=(0, 1))
 
     Z_SUM_XY_MAXS_FOLDED = np.empty((len(PKS), 1), dtype=object)
+
     for ii in range(len(PKS)):
         Z_SUM_XY_MAXS_FOLDED[ii, 0] = peak_local_max(Z_SUM_XY[:, ii], num_peaks=1)
         if Z_SUM_XY_MAXS_FOLDED[ii, 0].size == 0:
             Z_SUM_XY_MAXS_FOLDED[ii, 0] = np.array([[0]])
 
     Z_SUM_XY_MAXS = []
+
     for ii in range(len(Z_SUM_XY_MAXS_FOLDED)):
         if len(Z_SUM_XY_MAXS_FOLDED[ii, 0]) != 1:
             for jj in range(len(Z_SUM_XY_MAXS_FOLDED[ii, 0])):
@@ -468,7 +550,7 @@ def positions3D(GS, peak_min_distance, num_particles, MPP):
     Z_SUM_XY_MAXS = np.array(Z_SUM_XY_MAXS)
 
     # Use Z_SUM_XY and Z_SUM_XY_MAXS
-    w = 2  # 2
+    w = 2
     pol = lambda a, x: a[0] * x ** 2 + a[1] * x + a[2]
     z_max = []
 
@@ -486,7 +568,6 @@ def positions3D(GS, peak_min_distance, num_particles, MPP):
         idi_max = np.where(interp_val == interp_val.max())[0][0]
         z_max.append(interp_idi[idi_max])
 
-    # XYZ_POSITIONS = np.hstack((XYZ_POSITIONS, Z_SUM_XY_MAXS[:, 0]))    # YXZ_POSITIONS = np.insert(PKS, 2, Z_SUM_XY_MAXS[:, 0], axis=-1)         # Actually [Y, X, Z]
     YXZ_POSITIONS = np.insert(np.float16(PKS), 2, z_max, axis=-1)
 
     return YXZ_POSITIONS  # (x,y) in pixels, z in slice number
