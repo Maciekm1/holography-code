@@ -177,7 +177,7 @@ class holography:
     
     
     #%% rayleighSommerfeldPropagator
-    def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter):
+    def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter, bp_smallest_px=4, bp_largest_px=60):
         ## Rayleigh-Sommerfeld Back Propagator
         #   Inputs:          I - hologram (grayscale)
         #             I_MEDIAN - median image
@@ -197,7 +197,7 @@ class holography:
         #     IN[IN < 0] = 0
     
         if bandpass:
-            _, BP = bandpassFilter(IN, 2, 30)
+            _, BP = bandpassFilter(IN, bp_smallest_px, bp_largest_px)
             E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
         else:
             E = np.fft.fftshift(np.fft.fft2(IN - 1))
