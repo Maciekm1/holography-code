@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu May 21 20:17:55 2020
-
 @author: erick
 
 Modified on Fri October 18 11:59:55 2024
-
 @author: Maciek
 """
 

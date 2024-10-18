@@ -1,54 +1,18 @@
 import cv2
 import numpy as np
-# %% rgb2gray
-def rgb2gray(img):
-    ## Convert rgb image to grayscale using Y' = 0.299R'+0.587G' + 0.114B'
-    # Input:     img - RBG image
-    # Output: img_gs - Grayscale image
-    import numpy as np
-    [ni, nj, nk] = img.shape
-    img_gs = np.empty([ni, nj])
-    for ii in range(0, ni):
-        for jj in range(0, nj):
-            img_gs[ii, jj] = 0.299 * img[ii, jj, 0] + 0.587 * img[ii, jj, 1] + 0.114 * img[ii, jj, 2]
+from skimage.feature import peak_local_max
+import os
+from cv2 import VideoWriter, VideoWriter_fourcc
+from scipy import ndimage
+from scipy.ndimage import median_filter
 
-    return img_gs
-
-
-# %% square_image
-def square_image(img):
-    ## Make image square by adding rows or columns of the mean value of the image np.mean(img)
-    # Input: img - grayscale image
-    # Output: imgs - square image
-    #         axis - axis where data is added
-    #            d - number of rows/columns added
-    import numpy as np
-
-    [ni, nj] = img.shape
-    dn = ni - nj
-    d = abs(dn)
-    if dn < 0:
-        M = np.flip(img[ni - abs(dn):ni, :], 0)
-        imgs = np.concatenate((img, M), axis=0)
-        axis = 'i'
-    elif dn > 0:
-        M = np.flip(img[:, nj - abs(dn):nj], 1)
-        imgs = np.concatenate((img, M), axis=1)
-        axis = 'j'
-    elif dn == 0:
-        imgs = img
-        axis = 'square'
-    return imgs, axis, d
-
-
-# %% bandpassFilter
+# bandpassFilter
 def bandpassFilter(img, xs, xl):
     ## Bandpass filter
     # Input: img - Grayscale image array (2D)
     #        xl  - Large cutoff size (Pixels)
     #        xs  - Small cutoff size (Pixels)
     # Output: img_filt - filtered image
-    import numpy as np
 
     # FFT the grayscale image
     imgfft = np.fft.fft2(img)
@@ -85,59 +49,7 @@ def bandpassFilter(img, xs, xl):
 
     return img_filt, BPP
 
-# %% videoImport
-'''def videoImport(video, N):
-    ## Import video as stack of images in a 3D array
-    #   Input:  video   - path to video file
-    #               N   - frame number to import
-    #   Output: imStack - 3D array of stacked images in 8-bit
-    import cv2
-    import numpy as np
-
-    CAP = cv2.VideoCapture(video)
-    NUM_FRAMES = int(CAP.get(cv2.CAP_PROP_FRAME_COUNT))
-    WIDTH = int(CAP.get(cv2.CAP_PROP_FRAME_WIDTH))
-    HEIGHT = int(CAP.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    # IMG = np.empty((NUM_FRAMES, HEIGHT, WIDTH, 3), np.dtype('uint8'))
-    # IM_STACK = np.empty((NUM_FRAMES, HEIGHT, WIDTH))
-
-    I = 0
-    SUCCESS = True
-
-    if N == 0:
-        # IMG = np.empty((NUM_FRAMES, HEIGHT, WIDTH, 3), dtype='float16')
-        IMG = np.empty((HEIGHT, WIDTH, 3))
-        IM_STACK = np.empty((NUM_FRAMES, HEIGHT, WIDTH), dtype='float32')
-
-        while (I < NUM_FRAMES and SUCCESS):
-            SUCCESS, IMG = CAP.read()
-            # IM_STACK[I] = IMG[I, :, :, 1]
-            IM_STACK[I] = IMG[:, :, 0]
-            I += 1
-            # print(('VI', I))
-
-    elif N > 0:
-        IMG = np.empty((NUM_FRAMES, HEIGHT, WIDTH, 3), dtype='float32')
-        IM_STACK = np.empty((NUM_FRAMES, HEIGHT, WIDTH))
-        STACK = IM_STACK
-
-        while (I < NUM_FRAMES and SUCCESS):
-            SUCCESS, IMG[I] = CAP.read()
-            STACK[I] = IMG[I, :, :, 1]
-            if I == N:
-                IM_STACK = IMG[I, :, :, 1]
-                FRAMENUM = I
-                print(('VI', I))
-            I += 1
-    CAP.release()
-
-    if N == 0:
-        IM_STACK = np.swapaxes(np.swapaxes(IM_STACK, 0, 2), 0, 1)
-
-    return IM_STACK
-'''
-
+# videoImport
 def videoImport(video, N):
     """
     Import video frames as a 3D array of grayscale images.
@@ -210,7 +122,7 @@ def videoImport(video, N):
 
     return imStack
 
-# %% exportAVI
+# exportAVI
 def exportAVI(filename, IM, NI, NJ, fps):
     ## Export 3D array to .AVI movie file
     #   Input:  IM - numpy 3D array
@@ -218,10 +130,6 @@ def exportAVI(filename, IM, NI, NJ, fps):
     #           NJ - number of columns of array
     #          fps - frames per second of output file
     #   Output: .AVI file in working folder
-    import os
-    import numpy as np
-    from cv2 import VideoWriter, VideoWriter_fourcc
-
     dir = os.getcwd()
     filenames = os.path.join(dir, filename)
     FOURCC = VideoWriter_fourcc(*'MJPG')
@@ -238,7 +146,7 @@ def exportAVI(filename, IM, NI, NJ, fps):
     print(filename, 'exported successfully')
     return
 
-# %% rayleighSommerfeldPropagator
+# rayleighSommerfeldPropagator
 def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter, bp_smallest_px=4,
                                  bp_largest_px=60):
     ## Rayleigh-Sommerfeld Back Propagator
@@ -246,8 +154,6 @@ def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandp
     #             I_MEDIAN - median image
     #                    Z - numpy array defining defocusing distances
     #   Output:        IMM - 3D array representing stack of images at different Z
-    import numpy as np
-    from scipy.ndimage import median_filter
 
     # Divide by Median image
     I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
@@ -304,13 +210,12 @@ def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandp
     return IZ
 
 
-# %% medianImage
+# medianImage
 def medianImage(VID, numFrames):
     ## Median Image
     #   Input:   VID - 3D numpy array of video file
     #            numFrames - Number of frames to calculat median image
     #   Output: MEAN - 2D pixel mean array
-    import numpy as np
 
     def spaced_elements(array, numElems):
         out = array[np.round(np.linspace(0, len(array) - 1, numElems)).astype(int)]
@@ -325,15 +230,13 @@ def medianImage(VID, numFrames):
     return MEAN
 
 
-# %% zGradientStack
+# zGradientStack
 def zGradientStack(IM):
     # Z-Gradient Stack
     #   Inputs:   I - hologram (grayscale)
     #            IM - median image
     #             Z - numpy array defining defocusing distances
     #   Output: CONV - 3D array representing stack of images at different Z
-    import numpy as np
-    from scipy import ndimage
 
     #    I = mpimg.imread('131118-1.png')
     #    I_MEDIAN = mpimg.imread('AVG_131118-2.png')
@@ -359,17 +262,13 @@ def zGradientStack(IM):
     return GS
 
 
-# %% modified_propagator
+# modified_propagator
 def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter):
     ## Modified Propagator
     #   Inputs:          I - hologram (grayscale)
     #             I_MEDIAN - median image
     #                    Z - numpy array defining defocusing distances
     #   Output:        GS - 3D Gradient Stack
-
-    import numpy as np
-    from functions import bandpassFilter
-    from scipy.ndimage import median_filter
 
     # Divide by Median image
     I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
@@ -461,10 +360,8 @@ def bgPathToArray(image_path):
     return image_u8
 
 
-# %% Positions batch
+# Positions batch
 def positions_batch(TUPLE):
-    import numpy as np
-    import functions as f
     I = TUPLE[0]
     I_MEDIAN = TUPLE[1]
     N = TUPLE[2]
@@ -478,11 +375,11 @@ def positions_batch(TUPLE):
 
     LOCS = np.empty((1, 3), dtype=object)
     X, Y, Z, I_FS, I_GS = [], [], [], [], []
-    IM = f.rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, False).astype('float32')
-    GS = f.zGradientStack(IM).astype('float32')
+    IM = rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, False).astype('float32')
+    GS = zGradientStack(IM).astype('float32')
     # GS = f.modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS)  # Modified propagator
     GS[GS < THRESHOLD] = 0
-    LOCS[0, 0] = f.positions3D(GS, peak_min_distance=PMD, num_particles='None', MPP=MPP)
+    LOCS[0, 0] = positions3D(GS, peak_min_distance=PMD, num_particles='None', MPP=MPP)
     A = LOCS[0, 0].astype('int')
     LOCS[0, 1] = IM[A[:, 0], A[:, 1], A[:, 2]]
     LOCS[0, 2] = GS[A[:, 0], A[:, 1], A[:, 2]]
@@ -496,10 +393,8 @@ def positions_batch(TUPLE):
     return [X, Y, Z, I_FS, I_GS]
 
 
-# %% Positions batch modified
+# Positions batch modified
 def positions_batch_modified(TUPLE):
-    import numpy as np
-    import functions as f
     I = TUPLE[0]
     I_MEDIAN = TUPLE[1]
     N = TUPLE[2]
@@ -518,9 +413,9 @@ def positions_batch_modified(TUPLE):
     X, Y, Z, I_FS, I_GS = [], [], [], [], []
     # IM = f.rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, False).astype('float32')
     # GS = f.zGradientStack(IM).astype('float32')  
-    GS = f.modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, True)  # Modified propagator
+    GS = modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, True)  # Modified propagator
     GS[GS < THRESHOLD] = 0
-    LOCS[0, 0] = f.positions3D(GS, peak_min_distance=PMD, num_particles='None', MPP=MPP)
+    LOCS[0, 0] = positions3D(GS, peak_min_distance=PMD, num_particles='None', MPP=MPP)
     A = LOCS[0, 0].astype('int')
     LOCS[0, 1] = GS[A[:, 0], A[:, 1], A[:, 2]]
     LOCS[0, 2] = GS[A[:, 0], A[:, 1], A[:, 2]]
@@ -533,12 +428,9 @@ def positions_batch_modified(TUPLE):
 
     return [X, Y, Z, I_FS, I_GS]
 
-# %% Positions3D
+
 # Particles positions in 3D
 def positions3D(GS, peak_min_distance, num_particles, MPP):
-    import numpy as np
-    from skimage.feature import peak_local_max
-
     ZP = np.max(GS, axis=-1)
     if num_particles == 'None':
         PKS = peak_local_max(ZP, min_distance=peak_min_distance)  # 30
