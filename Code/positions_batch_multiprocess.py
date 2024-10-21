@@ -12,6 +12,7 @@ Modified on Fri October 18 11:59:55 2024
 
 # Import libraries
 import os
+import sys
 from multiprocessing import Pool, cpu_count
 from time import time
 from tqdm import tqdm
@@ -119,7 +120,7 @@ def main():
         med = np.empty((num_frames), dtype=object)
 
         for i in range(num_frames):
-            it[i] = vid[:, :, i]
+            it[i] = vid[i, :, :]
             med[i] = i_median
 
         # Parameters setup

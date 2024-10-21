@@ -5,7 +5,10 @@ import os
 from cv2 import VideoWriter, VideoWriter_fourcc
 from scipy import ndimage
 from scipy.ndimage import median_filter
+import sys
 
+# Temp Constant. Uses Median for BG if set to true, uses bg_image if set to false
+USE_MEDIAN = False
 
 def bandpassFilter(img, xs, xl):
     """
@@ -154,37 +157,6 @@ def bgPathToArray(image_path):
     return image_u8
 
 
-def exportAvi(filename, IM, NI, NJ, fps):
-    """
-    Export a 3D array to a .AVI movie file.
-
-    Parameters:
-    ----------
-    filename : str
-        Name of the output .AVI file.
-    IM : np.ndarray
-        3D numpy array containing image data.
-    NI : int
-        Number of rows of the array.
-    NJ : int
-        Number of columns of the array.
-    fps : int
-        Frames per second of output file.
-    """
-    dir = os.getcwd()
-    file_path = os.path.join(dir, filename)
-    fourcc = VideoWriter_fourcc(*'MJPG')
-    video = VideoWriter(file_path, fourcc, float(fps), (NJ, NI), 0)
-
-    for i in range(IM.shape[2]):
-        frame = IM[:, :, i]
-        frame = np.uint8(255 * frame / frame.max())
-        video.write(frame)
-
-    video.release()
-    print(f"{filename} exported successfully")
-
-
 def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter,
                                     bp_smallest_px=4, bp_largest_px=60):
     """
@@ -216,8 +188,26 @@ def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandp
     IZ : np.ndarray
         3D array representing stack of images at different Z.
     """
-    I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
-    IN = I / I_MEDIAN
+    if USE_MEDIAN:
+        I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
+        IN = I / I_MEDIAN
+        #print(I_MEDIAN.shape)
+    else:
+        bg_array = bgPathToArray('C:/Users/mz1794/Downloads/Python and Viking DHM port-20241010T094616Z-001/Python and Viking DHM port/1024bg.png')
+        if bg_array.shape[0] != I.shape[0]:
+            #bg_array = np.mean(bg_array, axis=0, keepdims=True)  # Adjust bg_array to match I's shape using mean
+            bg_array = bg_array[:50, :]  # Now shape is (50, 1024)
+        IN = I / bg_array
+
+    # Correct up to this point, Corresponds to  I/ bg_array division in LabVIEW, not sure about the decrement after(in labVIEW vs this)?
+    #print('*'*150)
+    #print(I)
+    #print(I.shape)
+    #print('-' * 150)
+    #print(IN)
+    #print(IN.shape)
+    #print('*'*150)
+    #sys.exit()
 
     if med_filter:
         IN = median_filter(IN, size=1)
@@ -227,6 +217,8 @@ def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandp
         E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
     else:
         E = np.fft.fftshift(np.fft.fft2(IN - 1))
+
+    # TEST IF BANDPASS CORRECT
 
     LAMBDA = LAMBDA
     FS = FS
@@ -571,3 +563,34 @@ def positions3D(GS, peak_min_distance, num_particles, MPP):
     YXZ_POSITIONS = np.insert(np.float16(PKS), 2, z_max, axis=-1)
 
     return YXZ_POSITIONS  # (x,y) in pixels, z in slice number
+
+
+def exportAvi(filename, IM, NI, NJ, fps):
+    """
+    Export a 3D array to a .AVI movie file.
+
+    Parameters:
+    ----------
+    filename : str
+        Name of the output .AVI file.
+    IM : np.ndarray
+        3D numpy array containing image data.
+    NI : int
+        Number of rows of the array.
+    NJ : int
+        Number of columns of the array.
+    fps : int
+        Frames per second of output file.
+    """
+    dir = os.getcwd()
+    file_path = os.path.join(dir, filename)
+    fourcc = VideoWriter_fourcc(*'MJPG')
+    video = VideoWriter(file_path, fourcc, float(fps), (NJ, NI), 0)
+
+    for i in range(IM.shape[2]):
+        frame = IM[:, :, i]
+        frame = np.uint8(255 * frame / frame.max())
+        video.write(frame)
+
+    video.release()
+    print(f"{filename} exported successfully")
