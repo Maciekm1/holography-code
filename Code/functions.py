@@ -219,6 +219,11 @@ def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandp
         E = np.fft.fftshift(np.fft.fft2(IN - 1))
 
     # TEST IF BANDPASS CORRECT
+    print('*'*150)
+    print(E)
+    print(E.shape)
+    print('*'*150)
+    sys.exit()
 
     LAMBDA = LAMBDA
     FS = FS
