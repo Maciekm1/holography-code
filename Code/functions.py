@@ -40,6 +40,7 @@ def bandpassFilter(img, xs, xl):
 
     LCO = np.exp(-((ii - MIS / 2) ** 2 + (jj - MIS / 2) ** 2) * (2 * xl / MIS) ** 2)
     SCO = np.exp(-((ii - MIS / 2) ** 2 + (jj - MIS / 2) ** 2) * (2 * xs / MIS) ** 2)
+    #BP matches up with LabVIEW
     BP = SCO - LCO
     BPP = np.fft.ifftshift(BP)
 
@@ -157,8 +158,8 @@ def bgPathToArray(image_path):
     return image_u8
 
 
-def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter,
-                                    bp_smallest_px=4, bp_largest_px=60):
+def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, SRV, FS, SZ, NUMSTEPS, bandpass, med_filter,
+                                    BG_IMAGE, bp_smallest_px=4, bp_largest_px=60):
     """
     Rayleigh-Sommerfeld Back Propagator.
 
@@ -193,11 +194,12 @@ def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandp
         IN = I / I_MEDIAN
         #print(I_MEDIAN.shape)
     else:
-        bg_array = bgPathToArray('C:/Users/mz1794/Downloads/Python and Viking DHM port-20241010T094616Z-001/Python and Viking DHM port/1024bg.png')
-        if bg_array.shape[0] != I.shape[0]:
+        #TODO: Filter BG Image i.e. remove 0s
+        #bg_array = bgPathToArray('C:/Users/mz1794/Downloads/Python and Viking DHM port-20241010T094616Z-001/Python and Viking DHM port/1024bg.png')
+        #if BG_IMAGE.shape[0] != I.shape[0]:
             #bg_array = np.mean(bg_array, axis=0, keepdims=True)  # Adjust bg_array to match I's shape using mean
-            bg_array = bg_array[:50, :]  # Now shape is (50, 1024)
-        IN = I / bg_array
+            #bg_array = BG_IMAGE[:50, :]  # Now shape is (50, 1024)
+        IN = I / BG_IMAGE
 
     # Correct up to this point, Corresponds to  I/ bg_array division in LabVIEW, not sure about the decrement after(in labVIEW vs this)?
     #print('*'*150)
@@ -214,21 +216,22 @@ def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandp
 
     if bandpass:
         _, BP = bandpassFilter(IN, bp_smallest_px, bp_largest_px)
-        E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
+        fft_after_decrement = np.fft.fft2(IN - 1)
+        E = np.fft.fftshift(BP) * np.fft.fftshift(fft_after_decrement)
     else:
         E = np.fft.fftshift(np.fft.fft2(IN - 1))
 
     # TEST IF BANDPASS CORRECT
-    print('*'*150)
-    print(E)
-    print(E.shape)
-    print('*'*150)
-    sys.exit()
+    #print('*'*150)
+    #print(E)
+    #print(E.shape)
+    #print('*'*150)
+    #sys.exit()
 
     LAMBDA = LAMBDA
     FS = FS
     NI, NJ = IN.shape
-    Z = SZ * np.arange(0, NUMSTEPS)
+    Z = SRV + (SZ * np.arange(0, NUMSTEPS))
     K = 2 * np.pi * N / LAMBDA  # Wavenumber
 
     jj, ii = np.meshgrid(np.arange(NJ), np.arange(NI))
@@ -248,6 +251,7 @@ def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandp
 
     for k in range(Z.shape[0]):
         R = np.exp((-1j * K * Z[k] * Q), dtype='complex64')
+        #Inverse FFT
         IZ[:, :, k] = np.real(1 + np.fft.ifft2(np.fft.ifftshift(E * R)))
 
     return IZ
@@ -380,7 +384,8 @@ def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_
 
 def positions_batch(TUPLE):
     """
-    Process a batch of positions from the input tuple.
+    Process a batch of positions from the input tuple. The Tuple corresponds to a frame.This function will be called
+    on different processors with a different tuple (frame) each time.
 
     Parameters:
     ----------
@@ -406,16 +411,20 @@ def positions_batch(TUPLE):
     N = TUPLE[2]
     LAMBDA = TUPLE[3]
     MPP = TUPLE[4]
+    SRV = TUPLE[5]
     FS = (MPP / 10) * 0.711
-    SZ = TUPLE[5]
-    NUMSTEPS = TUPLE[6]
-    THRESHOLD = TUPLE[7]
-    PMD = TUPLE[8]
+    SZ = TUPLE[6]
+    NUMSTEPS = TUPLE[7]
+    BPL = TUPLE[8]
+    BPS = TUPLE[9]
+    THRESHOLD = TUPLE[10]
+    PMD = TUPLE[11]
+    BG_IMAGE = TUPLE[12]
 
     LOCS = np.empty((1, 3), dtype=object)
     X, Y, Z, I_FS, I_GS = [], [], [], [], []
 
-    IM = rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, False).astype('float32')
+    IM = rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, SRV,  FS, SZ, NUMSTEPS, True, False, BG_IMAGE, bp_largest_px=BPL, bp_smallest_px=BPS).astype('float32')
     GS = zGradientStack(IM).astype('float32')
 
     GS[GS < THRESHOLD] = 0
@@ -462,11 +471,14 @@ def positions_batch_modified(TUPLE):
     N = TUPLE[2]
     LAMBDA = TUPLE[3]
     MPP = TUPLE[4]
+    SRV = TUPLE[5]
     FS = (MPP / 10) * 0.711
-    SZ = TUPLE[5]
-    NUMSTEPS = TUPLE[6]
-    THRESHOLD = TUPLE[7]
-    PMD = TUPLE[8]
+    SZ = TUPLE[6]
+    NUMSTEPS = TUPLE[7]
+    BPL = TUPLE[8]
+    BPS = TUPLE[9]
+    THRESHOLD = TUPLE[10]
+    PMD = TUPLE[11]
 
     # 0   1    2  3    4    5    6         7
     # zip(IT, MED, n, lam, mpp, sz, numsteps, pmd)

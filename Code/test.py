@@ -11,11 +11,11 @@ from mpl_toolkits.mplot3d import Axes3D
 
 # TODO - LabVIEW doesn't process/ save last frame??? frame 49 exists in python output but not in labVIEW
 # -1 for all frames
-FRAME = -1
-PYTHON_3D_DATA_PATH = r'C:/Users/mz1794/Downloads/Python and Viking DHM port-20241010T094616Z-001/Python and Viking DHM port/Python and Viking DHM _TH0.002_PMD30_SZ3.0_NUMSTEPS30_RS.csv'
+FRAME = 1
+PYTHON_3D_DATA_PATH = r'C:\Users\mz1794\Downloads\Python and Viking DHM port\Erick_s Code Output\OutputFiles\Python and Viking DHM _TH0.002_PMD30_SZ3.0_NUMSTEPS30_RS.csv'
 
 # 'frames' folder
-LABVIEW_3D_DATA_FOLDER_PATH = r"C:\Users\mz1794\Downloads\Python and Viking DHM port-20241010T094616Z-001\Python and Viking DHM port\frames"
+LABVIEW_3D_DATA_FOLDER_PATH = r"C:\Users\mz1794\Downloads\Python and Viking DHM port\frames"
 # which file to choose in 'frames' folder, without .txt or frame number (i.e. 00000/00001...)
 LABVIEW_FILE_NAME = "40x_100Hz_1081_CHO_1_T5_detrend_frame0-50_frame"
 
@@ -23,24 +23,26 @@ def main():
     # test bgPathToArray
     #  print(f.bgPathToArray(r'C:\Users\mz1794\Downloads\Python and Viking DHM port-20241010T094616Z-001\Python and Viking DHM port\1024bg.png'))
 
+    # Figure to show both plots on
     fig = plt.figure(figsize=(12, 6))
+
+    print('-' * 150)
     plot_3d_positions(fig, 121, FRAME)
     print('-' * 150)
-    plot_expected_3d_positions_from_folder(fig ,LABVIEW_3D_DATA_FOLDER_PATH,
-                                           122, FRAME)
+    plot_expected_3d_positions_from_folder(fig ,LABVIEW_3D_DATA_FOLDER_PATH,122, FRAME)
 
     plt.show()
 
 def plot_3d_positions(fig, subplot_pos, frame=-1):
     data = pd.read_csv(
         PYTHON_3D_DATA_PATH)
-    data_mod = pd.read_csv('C:/Users/mz1794/Downloads/Python and Viking DHM port-20241010T094616Z-001/Python and Viking DHM port/Python and Viking DHM _TH0.002_PMD20_SZ3.0_NUMSTEPS30_MOD.csv')
+    #data_mod = pd.read_csv('C:/Users/mz1794/Downloads/Python and Viking DHM port-20241010T094616Z-001/Python and Viking DHM port/Python and Viking DHM _TH0.002_PMD20_SZ3.0_NUMSTEPS30_MOD.csv')
     #data = data_mod
 
     if frame != -1:
         data = data[data['FRAME'] == frame]
 
-    print(len(data))
+    print('python datapoints: ' + str(len(data)))
 
     # Extract x, y, z coordinates
     x = data['X']
@@ -84,7 +86,7 @@ def plot_expected_3d_positions_from_folder(fig, folder_path, subplot_pos, frame=
         file_path = os.path.join(folder_path, filename)
         data = pd.read_csv(file_path, sep=r'\s+', header=None, names=['I', 'X', 'Y', 'Z'])
 
-    print(len(data))
+    print('labVIEW datapoints: ' + str(len(data)))
 
     # Extract x, y, z coordinates
     x = data['X']
@@ -103,7 +105,7 @@ def plot_expected_3d_positions_from_folder(fig, folder_path, subplot_pos, frame=
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-    # Show the plot
+    # Set the viewing angle
     ax.view_init(elev=20., azim=120)
     #plt.show()
 

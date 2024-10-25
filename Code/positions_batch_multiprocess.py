@@ -28,24 +28,30 @@ OPEN_FILE = True
 # GUI for selecting files and parameters
 def main():
     layout = [
-        [sg.Text('Select AVi File recording', size=(35, 1)),
+        [sg.Text('Video Path (.avi)', size=(35, 1)),
          sg.FileBrowse(initial_folder='', key='-FILE-')],
-        [sg.Text('Select Background Image', size=(35, 1)),
+        [sg.Text('BG Image Path (.png)', size=(35, 1)),
          sg.FileBrowse(initial_folder='', key='-BGIMAGE-')],
         [sg.Text('Propagator Scheme', size=(35, 1)),
          sg.Radio('Rayleigh-Sommerfeld', 'SCHEME', key='-RS-', default=True),
          sg.Radio('Modified', 'SCHEME', key='-MOD-')],
-        [sg.Text('Refraction index of media (water = 1.3226)', size=(35, 1)),
-         sg.InputText(default_text=1.3326, key='-N-')],
-        [sg.Text('Wavelength in um (~0.642)', size=(35, 1)),
+        [sg.Text('Wavelength (um)', size=(35, 1)),
          sg.InputText(default_text=0.642, key='-WAVELENGTH-')],
+        [sg.Text('Refractive Index (Water = 1.3226)', size=(35, 1)),
+         sg.InputText(default_text=1.3326, key='-N-')],
         [sg.Text('Magnification (10, 20, etc)', size=(35, 1)),
          sg.InputText(default_text=40, key='-MPP-')],
-        [sg.Text('Step size (10)', size=(35, 1)),
+        [sg.Text('Start Refocus Value (um)', size=(35, 1)),
+         sg.InputText(default_text=0, key='-SRV-')],
+        [sg.Text('Step Size (um)', size=(35, 1)),
          sg.InputText(default_text=3, key='-SZ-')],
-        [sg.Text('Number of steps (150)', size=(35, 1)),
+        [sg.Text('Number Of Steps', size=(35, 1)),
          sg.InputText(default_text=30, key='-NUMSTEPS-')],
-        [sg.Text('Gradient Stack Threshold (~0.1) just for RS', size=(35, 1)),
+        [sg.Text('BP Largest (px)', size=(35, 1)),
+         sg.InputText(default_text=60, key='-BPL-')],
+        [sg.Text('BP Smallest (px)', size=(35, 1)),
+         sg.InputText(default_text=4, key='-BPS-')],
+        [sg.Text('Gradient Stack Threshold (~0.1)', size=(35, 1)),
          sg.InputText(default_text=0.002, key='-THRESHOLD-')],
         [sg.Text('Peak Min Distance (20, 40, 60)', size=(35, 1)),
          sg.InputText(default_text=20, key='-PMD-')],
@@ -75,17 +81,20 @@ def main():
             #paths.append(values['-FILE-'])
             #bg_paths.append(values['-BGIMAGE-'])
             paths.append(
-                'C:/Users/mz1794/Downloads/Python and Viking DHM port-20241010T094616Z-001/Python and Viking DHM port/40x_100Hz_1081_CHO_1_T5_detrend_frame0-50.avi')
+                'C:/Users/mz1794/Downloads/Python and Viking DHM port/40x_100Hz_1081_CHO_1_T5_detrend_frame0-50.avi')
             bg_paths.append(
-                'C:/Users/mz1794/Downloads/Python and Viking DHM port-20241010T094616Z-001/Python and Viking DHM port/1024bg.png')
+                r"C:\Users\mz1794\Downloads\Python and Viking DHM port\1024bg.png")
 
             scheme = '-RS-' if values['-RS-'] else '-MOD-'
             params.append({
                 'N': float(values['-N-']),
                 'Wavelength': float(values['-WAVELENGTH-']),
                 'MPP': int(values['-MPP-']),
+                'SRV': int(values['-SRV-']),
                 'SZ': float(values['-SZ-']),
                 'NUMSTEPS': int(values['-NUMSTEPS-']),
+                'BPL': int(values['-BPL-']),
+                'BPS': int(values['-BPS-']),
                 'THRESHOLD': float(values['-THRESHOLD-']),
                 'PMD': int(values['-PMD-']),
                 'FRAMERATE': int(values['-FRAMERATE-']),
@@ -124,9 +133,10 @@ def main():
             med[i] = i_median
 
         # Parameters setup
-        n, lam, mpp, sz, numsteps = (params[k]['N'], params[k]['Wavelength'],
-                                     params[k]['MPP'], params[k]['SZ'],
-                                     params[k]['NUMSTEPS'])
+        n, lam, mpp, srv, sz, numsteps, bpl, bps = (params[k]['N'], params[k]['Wavelength'],
+                                     params[k]['MPP'], params[k]['SRV'], params[k]['SZ'],
+                                     params[k]['NUMSTEPS'], params[k]['BPL'], params[k]['BPS'])
+
         threshold, pmd = (params[k]['THRESHOLD'], params[k]['PMD'])
 
         pool = Pool(cpu_count())  # Number of cores to use
@@ -138,10 +148,22 @@ def main():
 
         scheme_func = f.positions_batch if params[k]['SCHEME'] == '-RS-' else f.positions_batch_modified
 
+        # Parallelization: Runs positions_batch from functions.py on multiple cores
+        #f.positions_batch(tuple([it, med, n, lam, mpp, sz, numsteps, threshold, pmd, bg_image]))
+
+        for params in zip(it, med, [n] * num_frames, [lam] * num_frames, [mpp] * num_frames, [srv] * num_frames,
+                          [sz] * num_frames, [numsteps] * num_frames,
+                          [bpl] * num_frames, [bps] * num_frames, [threshold] * num_frames,
+                          [pmd] * num_frames, bg_image):
+            result = scheme_func(params)
+            results.append(result)
+
         for _ in tqdm(pool.imap_unordered(scheme_func,
                                           zip(it, med, [n] * num_frames,
                                               [lam] * num_frames, [mpp] * num_frames,
+                                              [srv] * num_frames,
                                               [sz] * num_frames, [numsteps] * num_frames,
+                                              [bpl] * num_frames, [bps] * num_frames,
                                               [threshold] * num_frames, [pmd] * num_frames,
                                               bg_image)), total=num_frames):
             results.append(_)
