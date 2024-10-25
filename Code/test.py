@@ -12,7 +12,7 @@ from mpl_toolkits.mplot3d import Axes3D
 # TODO - LabVIEW doesn't process/ save last frame??? frame 49 exists in python output but not in labVIEW
 # -1 for all frames
 FRAME = 1
-PYTHON_3D_DATA_PATH = r'C:\Users\mz1794\Downloads\Python and Viking DHM port\Erick_s Code Output\OutputFiles\Python and Viking DHM _TH0.002_PMD30_SZ3.0_NUMSTEPS30_RS.csv'
+PYTHON_3D_DATA_PATH = r'C:/Users/mz1794/Downloads/Python and Viking DHM port/Python and Viking DHM _TH0.0002_PMD20_SZ3.0_NUMSTEPS30_RS.csv'
 
 # 'frames' folder
 LABVIEW_3D_DATA_FOLDER_PATH = r"C:\Users\mz1794\Downloads\Python and Viking DHM port\frames"

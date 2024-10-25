@@ -57,6 +57,7 @@ def main():
          sg.InputText(default_text=20, key='-PMD-')],
         [sg.Text('Frame Rate', size=(35, 1)),
          sg.InputText(default_text=50, key='-FRAMERATE-')],
+        [sg.Checkbox('Use BG Image', default=True, key='-USEBG-')],
         [sg.Checkbox('Invert Video', default=False, key='-INVERT-')],
         [sg.Checkbox('Export as CSV', default=True, key='-EXPORT-')],
         [sg.Text('Number of frames for calculations', size=(35, 1)),
@@ -98,6 +99,7 @@ def main():
                 'THRESHOLD': float(values['-THRESHOLD-']),
                 'PMD': int(values['-PMD-']),
                 'FRAMERATE': int(values['-FRAMERATE-']),
+                'USEBG': values['-USEBG-'],
                 'INVERT': values['-INVERT-'],
                 'EXPORT': values['-EXPORT-'],
                 'NUMFRAMES': int(values['-NUMFRAMES-']) if values['-NUMFRAMES-'] else None,
@@ -133,9 +135,9 @@ def main():
             med[i] = i_median
 
         # Parameters setup
-        n, lam, mpp, srv, sz, numsteps, bpl, bps = (params[k]['N'], params[k]['Wavelength'],
+        n, lam, mpp, srv, sz, numsteps, bpl, bps, use_bg = (params[k]['N'], params[k]['Wavelength'],
                                      params[k]['MPP'], params[k]['SRV'], params[k]['SZ'],
-                                     params[k]['NUMSTEPS'], params[k]['BPL'], params[k]['BPS'])
+                                     params[k]['NUMSTEPS'], params[k]['BPL'], params[k]['BPS'], params[k]['USEBG'])
 
         threshold, pmd = (params[k]['THRESHOLD'], params[k]['PMD'])
 
@@ -149,12 +151,11 @@ def main():
         scheme_func = f.positions_batch if params[k]['SCHEME'] == '-RS-' else f.positions_batch_modified
 
         # Parallelization: Runs positions_batch from functions.py on multiple cores
-        #f.positions_batch(tuple([it, med, n, lam, mpp, sz, numsteps, threshold, pmd, bg_image]))
 
         for params in zip(it, med, [n] * num_frames, [lam] * num_frames, [mpp] * num_frames, [srv] * num_frames,
                           [sz] * num_frames, [numsteps] * num_frames,
                           [bpl] * num_frames, [bps] * num_frames, [threshold] * num_frames,
-                          [pmd] * num_frames, bg_image):
+                          [pmd] * num_frames, bg_image, [use_bg] * num_frames):
             result = scheme_func(params)
             results.append(result)
 
@@ -165,7 +166,7 @@ def main():
                                               [sz] * num_frames, [numsteps] * num_frames,
                                               [bpl] * num_frames, [bps] * num_frames,
                                               [threshold] * num_frames, [pmd] * num_frames,
-                                              bg_image)), total=num_frames):
+                                              bg_image, use_bg)), total=num_frames):
             results.append(_)
 
         times.append(time() - t0)
