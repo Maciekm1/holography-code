@@ -2,10 +2,8 @@ import cv2
 import numpy as np
 from skimage.feature import peak_local_max
 import os
-from cv2 import VideoWriter, VideoWriter_fourcc
 from scipy import ndimage
 from scipy.ndimage import median_filter
-import sys
 
 def bandpassFilter(img, xs, xl):
     """
@@ -394,66 +392,71 @@ def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_
     return GS
 
 
-def positions_batch(TUPLE):
+def positions_batch(params):
     """
-    Process a batch of positions from the input tuple. The Tuple corresponds to a frame.This function will be called
-    on different processors with a different tuple (frame) each time.
+    Process a batch of positions from the input tuple. The Tuple corresponds to a single frame of .avi file.
+    This function will be called on different processors with a different tuple (frame) each time.
 
     Parameters:
     ----------
-    TUPLE : tuple
-        A tuple containing the following elements:
-        - I (np.ndarray): Hologram.
-        - I_MEDIAN (np.ndarray): Median image.
-        - N (float): Index of refraction.
-        - LAMBDA (float): Wavelength.
-        - MPP (float): Microns per pixel.
-        - SZ (float): Step size.
-        - NUMSTEPS (int): Number of steps in propagation.
-        - THRESHOLD (float): Threshold for GS.
-        - PMD (float): Peak minimum distance.
+    params : tuple
+        A tuple containing:
+        - hologram (np.ndarray): Frame hologram.
+        - median_img (np.ndarray): Median image of frames.
+        - ref_index (float): Refractive index.
+        - wavelength (float): Wavelength of light.
+        - magnification (float): Magnification level (e.g., 40x).
+        - start_refocus (float): Starting value for refocus.
+        - step_size (float): Step size for propagation.
+        - num_steps (int): Number of propagation steps.
+        - bandpass_max_px (int): Largest pixel size for bandpass filter.
+        - bandpass_min_px (int): Smallest pixel size for bandpass filter.
+        - threshold (float): Threshold for gradient stack.
+        - peak_min_distance (int): Minimum peak distance.
+        - bg_image (np.ndarray): Background image array.
+        - use_bg_image (bool): Flag for using background image.
 
     Returns:
     -------
     list
         A list containing the X, Y, Z positions and intensity arrays (I_FS, I_GS).
     """
-    I = TUPLE[0]
-    I_MEDIAN = TUPLE[1]
-    N = TUPLE[2]
-    LAMBDA = TUPLE[3]
-    MPP = TUPLE[4]
-    SRV = TUPLE[5]
-    FS = (MPP / 10) * 0.711
-    SZ = TUPLE[6]
-    NUMSTEPS = TUPLE[7]
-    BPL = TUPLE[8]
-    BPS = TUPLE[9]
-    THRESHOLD = TUPLE[10]
-    PMD = TUPLE[11]
-    BG_IMAGE = TUPLE[12]
-    USE_BG = TUPLE[13]
 
-    LOCS = np.empty((1, 3), dtype=object)
-    X, Y, Z, I_FS, I_GS = [], [], [], [], []
+    # Unpack params
+    (hologram, median_img, ref_index, wavelength, magnification,
+     start_refocus, step_size, num_steps, bandpass_max_px, bandpass_min_px,
+     threshold, peak_min_distance, bg_image, use_bg_image) = params
 
-    IM = rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, SRV,  FS, SZ, NUMSTEPS, True, False, BG_IMAGE, USE_BG, bp_largest_px=BPL, bp_smallest_px=BPS).astype('float32')
-    GS = zGradientStack(IM).astype('float32')
+    # Calculate scale factor (microns per pixel)
+    scale_factor = (magnification / 10) * 0.711  # Adjusted by 0.711 based on system specs
 
-    GS[GS < THRESHOLD] = 0
-    LOCS[0, 0] = positions3D(GS, peak_min_distance=PMD, num_particles='None', MPP=MPP)
-    A = LOCS[0, 0].astype('int')
+    locs = np.empty((1, 3), dtype=object)
+    x_coords, y_coords, z_coords, intensity_fs, intensity_gs = [], [], [], [], []
 
-    LOCS[0, 1] = IM[A[:, 0], A[:, 1], A[:, 2]]
-    LOCS[0, 2] = GS[A[:, 0], A[:, 1], A[:, 2]]
+    # Processing
+    propagated_image = rayleighSommerfeldPropagator(
+        hologram, median_img, ref_index, wavelength, start_refocus,
+        scale_factor, step_size, num_steps, True, False, bg_image, use_bg_image,
+        bp_largest_px=bandpass_max_px, bp_smallest_px=bandpass_min_px
+    ).astype('float32')
 
-    X.append(LOCS[0, 0][:, 0] * (1 / FS))
-    Y.append(LOCS[0, 0][:, 1] * (1 / FS))
-    Z.append(LOCS[0, 0][:, 2] * SZ)
-    I_FS.append(LOCS[0, 1])
-    I_GS.append(LOCS[0, 2])
+    grad_stack = zGradientStack(propagated_image).astype('float32')
+    grad_stack[grad_stack < threshold] = 0
 
-    return [X, Y, Z, I_FS, I_GS]
+    locs[0, 0] = positions3D(grad_stack, peak_min_distance=peak_min_distance, MPP=scale_factor)
+    coords = locs[0, 0].astype('int')
+
+    locs[0, 1] = propagated_image[coords[:, 0], coords[:, 1], coords[:, 2]]
+    locs[0, 2] = grad_stack[coords[:, 0], coords[:, 1], coords[:, 2]]
+
+    # Collect results
+    x_coords.append(coords[:, 0] * (1 / scale_factor))
+    y_coords.append(coords[:, 1] * (1 / scale_factor))
+    z_coords.append(coords[:, 2] * step_size)
+    intensity_fs.append(locs[0, 1])
+    intensity_gs.append(locs[0, 2])
+
+    return [x_coords, y_coords, z_coords, intensity_fs, intensity_gs]
 
 
 def positions_batch_modified(TUPLE):
@@ -618,34 +621,3 @@ def positions3D(GS, peak_min_distance, num_particles, MPP):
     YXZ_POSITIONS = np.insert(np.float16(PKS), 2, z_max, axis=-1)
 
     return YXZ_POSITIONS  # (x,y) in pixels, z in slice number
-
-
-def exportAvi(filename, IM, NI, NJ, fps):
-    """
-    Export a 3D array to a .AVI movie file.
-
-    Parameters:
-    ----------
-    filename : str
-        Name of the output .AVI file.
-    IM : np.ndarray
-        3D numpy array containing image data.
-    NI : int
-        Number of rows of the array.
-    NJ : int
-        Number of columns of the array.
-    fps : int
-        Frames per second of output file.
-    """
-    dir = os.getcwd()
-    file_path = os.path.join(dir, filename)
-    fourcc = VideoWriter_fourcc(*'MJPG')
-    video = VideoWriter(file_path, fourcc, float(fps), (NJ, NI), 0)
-
-    for i in range(IM.shape[2]):
-        frame = IM[:, :, i]
-        frame = np.uint8(255 * frame / frame.max())
-        video.write(frame)
-
-    video.release()
-    print(f"{filename} exported successfully")

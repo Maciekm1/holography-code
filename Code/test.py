@@ -1,13 +1,6 @@
 import os
-import cv2
-import numpy as np
-import pandas as pd
-from matplotlib.pyplot import subplot
-
-import functions as f
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
+import pandas as pd
 
 # TODO - LabVIEW doesn't process/ save last frame??? frame 49 exists in python output but not in labVIEW
 # -1 for all frames

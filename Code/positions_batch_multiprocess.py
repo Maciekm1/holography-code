@@ -12,11 +12,9 @@ Modified on Fri October 18 11:59:55 2024
 
 # Import libraries
 import os
-import sys
 from multiprocessing import Pool, cpu_count
 from time import time
 from tqdm import tqdm
-
 import PySimpleGUI as sg
 import numpy as np
 import pandas as pd
@@ -70,6 +68,7 @@ def main():
     # Initialize data storage
     paths, bg_paths, params = [], [], []
 
+    # While loop for UI
     while True:
         event, values = window.read()
 
@@ -79,13 +78,15 @@ def main():
             break
         elif event == 'Add File':
             print(f'File {os.path.split(values["-FILE-"])[-1]} added to queue')
+
+            #--- TEMP FOR DEBUGGING
             #paths.append(values['-FILE-'])
             #bg_paths.append(values['-BGIMAGE-'])
             paths.append(
                 'C:/Users/mz1794/Downloads/Python and Viking DHM port/40x_100Hz_1081_CHO_1_T5_detrend_frame0-50.avi')
             bg_paths.append(
                 r"C:\Users\mz1794\Downloads\Python and Viking DHM port\1024bg.png")
-
+            #---
             scheme = '-RS-' if values['-RS-'] else '-MOD-'
             params.append({
                 'N': float(values['-N-']),
@@ -115,7 +116,7 @@ def main():
 
     for k, path in enumerate(paths):
         vid = f.videoImport(path, 0)
-        bg_image = f.bgPathToArray(bg_paths[k])
+        bg_image_array = f.bgPathToArray(bg_paths[k])
         ni, nj, nk = vid.shape
 
         if params[k]['INVERT']:
@@ -155,7 +156,7 @@ def main():
         for params in zip(it, med, [n] * num_frames, [lam] * num_frames, [mpp] * num_frames, [srv] * num_frames,
                           [sz] * num_frames, [numsteps] * num_frames,
                           [bpl] * num_frames, [bps] * num_frames, [threshold] * num_frames,
-                          [pmd] * num_frames, bg_image, [use_bg] * num_frames):
+                          [pmd] * num_frames, bg_image_array, [use_bg] * num_frames):
             result = scheme_func(params)
             results.append(result)
 
@@ -166,7 +167,7 @@ def main():
                                               [sz] * num_frames, [numsteps] * num_frames,
                                               [bpl] * num_frames, [bps] * num_frames,
                                               [threshold] * num_frames, [pmd] * num_frames,
-                                              bg_image, use_bg)), total=num_frames):
+                                              bg_image_array, use_bg)), total=num_frames):
             results.append(_)
 
         times.append(time() - t0)
