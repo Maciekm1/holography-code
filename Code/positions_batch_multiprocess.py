@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu May 21 20:17:55 2020
-@author: erick
+Holographic Coordinate Detection Script with Progress Bar
 
-Modified on Fri October 18 11:59:55 2024
-@author: Maciek
+Original Author: Erick
+Modified by: Maciek (October 18, 2024)
 """
 
-# Holographic Coordinate Detection
-
-# Import libraries
 import os
 from multiprocessing import Pool, cpu_count
 from time import time
@@ -18,166 +14,120 @@ from tqdm import tqdm
 import PySimpleGUI as sg
 import numpy as np
 import pandas as pd
-import functions as f
+import functions as func
 
-# Constant for opening File after export
-OPEN_FILE = True
+# Flag to automatically open file after export
+OPEN_CSV_AFTER_EXPORT = True
 
-# GUI for selecting files and parameters
+# GUI configuration and setup
 def main():
     layout = [
-        [sg.Text('Video Path (.avi)', size=(35, 1)),
-         sg.FileBrowse(initial_folder='', key='-FILE-')],
-        [sg.Text('BG Image Path (.png)', size=(35, 1)),
-         sg.FileBrowse(initial_folder='', key='-BGIMAGE-')],
+        [sg.Text('Video Path (.avi)', size=(35, 1)), sg.FileBrowse(key='-VIDEO-')],
+        [sg.Text('Background Image Path (.png)', size=(35, 1)), sg.FileBrowse(key='-BG_IMAGE-')],
         [sg.Text('Propagator Scheme', size=(35, 1)),
          sg.Radio('Rayleigh-Sommerfeld', 'SCHEME', key='-RS-', default=True),
          sg.Radio('Modified', 'SCHEME', key='-MOD-')],
-        [sg.Text('Wavelength (um)', size=(35, 1)),
-         sg.InputText(default_text=0.642, key='-WAVELENGTH-')],
-        [sg.Text('Refractive Index (Water = 1.3226)', size=(35, 1)),
-         sg.InputText(default_text=1.3326, key='-N-')],
-        [sg.Text('Magnification (10, 20, etc)', size=(35, 1)),
-         sg.InputText(default_text=40, key='-MPP-')],
-        [sg.Text('Start Refocus Value (um)', size=(35, 1)),
-         sg.InputText(default_text=0, key='-SRV-')],
-        [sg.Text('Step Size (um)', size=(35, 1)),
-         sg.InputText(default_text=3, key='-SZ-')],
-        [sg.Text('Number Of Steps', size=(35, 1)),
-         sg.InputText(default_text=30, key='-NUMSTEPS-')],
-        [sg.Text('BP Largest (px)', size=(35, 1)),
-         sg.InputText(default_text=60, key='-BPL-')],
-        [sg.Text('BP Smallest (px)', size=(35, 1)),
-         sg.InputText(default_text=4, key='-BPS-')],
-        [sg.Text('Gradient Stack Threshold (~0.1)', size=(35, 1)),
-         sg.InputText(default_text=0.002, key='-THRESHOLD-')],
-        [sg.Text('Peak Min Distance (20, 40, 60)', size=(35, 1)),
-         sg.InputText(default_text=20, key='-PMD-')],
-        [sg.Text('Frame Rate', size=(35, 1)),
-         sg.InputText(default_text=50, key='-FRAMERATE-')],
-        [sg.Checkbox('Use BG Image', default=True, key='-USEBG-')],
-        [sg.Checkbox('Invert Video', default=False, key='-INVERT-')],
-        [sg.Checkbox('Export as CSV', default=True, key='-EXPORT-')],
-        [sg.Text('Number of frames for calculations', size=(35, 1)),
-         sg.InputText(default_text='50', key='-NUMFRAMES-')],
-        [sg.Button('Add File'), sg.Button('Start'), sg.Cancel()]
+        [sg.Text('Wavelength (μm)', size=(35, 1)), sg.InputText(default_text=0.642, key='-WAVELENGTH-')],
+        [sg.Text('Refractive Index (Water = 1.3226)', size=(35, 1)), sg.InputText(default_text=1.3326, key='-REFRACTIVE_INDEX-')],
+        [sg.Text('Magnification (10, 20, etc.)', size=(35, 1)), sg.InputText(default_text=40, key='-MAGNIFICATION-')],
+        [sg.Text('Start Refocus Value (μm)', size=(35, 1)), sg.InputText(default_text=0, key='-REFOCUS_START-')],
+        [sg.Text('Step Size (μm)', size=(35, 1)), sg.InputText(default_text=3, key='-STEP_SIZE-')],
+        [sg.Text('Number of Steps', size=(35, 1)), sg.InputText(default_text=30, key='-NUM_STEPS-')],
+        [sg.Text('Largest Bandpass Filter (px)', size=(35, 1)), sg.InputText(default_text=60, key='-BP_LARGE-')],
+        [sg.Text('Smallest Bandpass Filter (px)', size=(35, 1)), sg.InputText(default_text=4, key='-BP_SMALL-')],
+        [sg.Text('Gradient Stack Threshold (~0.1)', size=(35, 1)), sg.InputText(default_text=0.002, key='-GRAD_THRESHOLD-')],
+        [sg.Text('Peak Minimum Distance (px)', size=(35, 1)), sg.InputText(default_text=20, key='-PEAK_MIN_DIST-')],
+        [sg.Text('Frame Rate (fps)', size=(35, 1)), sg.InputText(default_text=50, key='-FRAME_RATE-')],
+        [sg.Checkbox('Use Background Image', default=True, key='-USE_BG-')],
+        [sg.Checkbox('Invert Video', default=False, key='-INVERT_VIDEO-')],
+        [sg.Checkbox('Export as CSV', default=True, key='-EXPORT_CSV-')],
+        [sg.Text('Frames for Calculation', size=(35, 1)), sg.InputText(default_text=50, key='-FRAME_COUNT-')],
+        [sg.Button('Add Video'), sg.Button('Start'), sg.Cancel()]
     ]
 
-    window = sg.Window('Holography video inputs', layout)
+    window = sg.Window('Holographic Video Input', layout)
+    video_paths, bg_image_paths, processing_params = [], [], []
 
-    # Initialize data storage
-    paths, bg_paths, params = [], [], []
-
-    # While loop for UI
     while True:
         event, values = window.read()
-
         if event in (sg.WIN_CLOSED, 'Cancel'):
             break
         elif event == 'Start':
             break
-        elif event == 'Add File':
-            print(f'File {os.path.split(values["-FILE-"])[-1]} added to queue')
-
+        elif event == 'Add Video':
+            print(f'Added {os.path.split(values["-VIDEO-"])[-1]} to queue.')
             #--- TEMP FOR DEBUGGING
             #paths.append(values['-FILE-'])
             #bg_paths.append(values['-BGIMAGE-'])
-            paths.append(
+            video_paths.append(
                 'C:/Users/mz1794/Downloads/Python and Viking DHM port/40x_100Hz_1081_CHO_1_T5_detrend_frame0-50.avi')
-            bg_paths.append(
+            bg_image_paths.append(
                 r"C:\Users\mz1794\Downloads\Python and Viking DHM port\1024bg.png")
             #---
             scheme = '-RS-' if values['-RS-'] else '-MOD-'
-            params.append({
-                'N': float(values['-N-']),
-                'Wavelength': float(values['-WAVELENGTH-']),
-                'MPP': int(values['-MPP-']),
-                'SRV': int(values['-SRV-']),
-                'SZ': float(values['-SZ-']),
-                'NUMSTEPS': int(values['-NUMSTEPS-']),
-                'BPL': int(values['-BPL-']),
-                'BPS': int(values['-BPS-']),
-                'THRESHOLD': float(values['-THRESHOLD-']),
-                'PMD': int(values['-PMD-']),
-                'FRAMERATE': int(values['-FRAMERATE-']),
-                'USEBG': values['-USEBG-'],
-                'INVERT': values['-INVERT-'],
-                'EXPORT': values['-EXPORT-'],
-                'NUMFRAMES': int(values['-NUMFRAMES-']) if values['-NUMFRAMES-'] else None,
-                'SCHEME': scheme
+            processing_params.append({
+                'refractive_index': float(values['-REFRACTIVE_INDEX-']),
+                'wavelength': float(values['-WAVELENGTH-']),
+                'magnification': int(values['-MAGNIFICATION-']),
+                'refocus_start': int(values['-REFOCUS_START-']),
+                'step_size': float(values['-STEP_SIZE-']),
+                'num_steps': int(values['-NUM_STEPS-']),
+                'bp_large': int(values['-BP_LARGE-']),
+                'bp_small': int(values['-BP_SMALL-']),
+                'grad_threshold': float(values['-GRAD_THRESHOLD-']),
+                'peak_min_dist': int(values['-PEAK_MIN_DIST-']),
+                'frame_rate': int(values['-FRAME_RATE-']),
+                'use_bg_image': values['-USE_BG-'],
+                'invert_video': values['-INVERT_VIDEO-'],
+                'export_csv': values['-EXPORT_CSV-'],
+                'frame_count': int(values['-FRAME_COUNT-']) if values['-FRAME_COUNT-'] else None,
+                'scheme': scheme
             })
 
     window.close()
-    print('-' * 150)
 
-    # Position detection
-    data = []
-    times = []
+    # Process each video file
+    for idx, video_path in enumerate(video_paths):
+        video_data = func.videoImport(video_path, 0)
+        bg_image = func.bgPathToArray(bg_image_paths[idx])
+        ni, nj, total_frames = video_data.shape
 
-    for k, path in enumerate(paths):
-        vid = f.videoImport(path, 0)
-        bg_image_array = f.bgPathToArray(bg_paths[k])
-        ni, nj, nk = vid.shape
+        if processing_params[idx]['invert_video']:
+            video_data = video_data.max() - video_data
 
-        if params[k]['INVERT']:
-            for i in range(nk):
-                vid[:, :, i] = vid[:, :, i].max() - vid[:, :, i]
+        median_frame = func.medianImage(video_data, 20)
+        frames_to_process = processing_params[idx]['frame_count'] or total_frames
 
-        frames_median = 20
-        i_median = f.medianImage(vid, frames_median)
+        frame_data = [video_data[i, :, :] for i in range(frames_to_process)]
+        median_data = [median_frame] * frames_to_process
 
-        num_frames = params[k]['NUMFRAMES'] if params[k]['NUMFRAMES'] is not None else nk
+        params = processing_params[idx]
+        scheme_function = func.positions_batch if params['scheme'] == '-RS-' else func.positions_batch_modified
 
-        it = np.empty((num_frames), dtype=object)
-        med = np.empty((num_frames), dtype=object)
+        with Pool(cpu_count()) as pool:
+            t_start = time()
+            print('-' * 150)
+            print(f'Processing file {idx + 1}/{len(video_paths)}: {os.path.split(video_path)[-1]}')
 
-        for i in range(num_frames):
-            it[i] = vid[i, :, :]
-            med[i] = i_median
+            # Execute batch processing in parallel with progress bar
+            results = []
+            with tqdm(total=frames_to_process, desc="Processing Frames", unit="frame") as progress_bar:
+                for res in pool.imap_unordered(scheme_function, zip(
+                    frame_data, median_data, [params['refractive_index']] * frames_to_process,
+                    [params['wavelength']] * frames_to_process, [params['magnification']] * frames_to_process,
+                    [params['refocus_start']] * frames_to_process, [params['step_size']] * frames_to_process,
+                    [params['num_steps']] * frames_to_process, [params['bp_large']] * frames_to_process,
+                    [params['bp_small']] * frames_to_process, [params['grad_threshold']] * frames_to_process,
+                    [params['peak_min_dist']] * frames_to_process, [bg_image] * frames_to_process,
+                    [params['use_bg_image']] * frames_to_process)):
+                    results.append(res)
+                    progress_bar.update(1)
 
-        # Parameters setup
-        n, lam, mpp, srv, sz, numsteps, bpl, bps, use_bg = (params[k]['N'], params[k]['Wavelength'],
-                                     params[k]['MPP'], params[k]['SRV'], params[k]['SZ'],
-                                     params[k]['NUMSTEPS'], params[k]['BPL'], params[k]['BPS'], params[k]['USEBG'])
-
-        threshold, pmd = (params[k]['THRESHOLD'], params[k]['PMD'])
-
-        pool = Pool(cpu_count())  # Number of cores to use
-        results = []
-        t0 = time()
-
-        print(f'Processing File {k + 1} of {len(paths)}: {os.path.split(path)[-1]}')
-        print('Parameters:', params[k])
-
-        scheme_func = f.positions_batch if params[k]['SCHEME'] == '-RS-' else f.positions_batch_modified
-
-        # Parallelization: Runs positions_batch from functions.py on multiple cores
-
-        for params in zip(it, med, [n] * num_frames, [lam] * num_frames, [mpp] * num_frames, [srv] * num_frames,
-                          [sz] * num_frames, [numsteps] * num_frames,
-                          [bpl] * num_frames, [bps] * num_frames, [threshold] * num_frames,
-                          [pmd] * num_frames, bg_image_array, [use_bg] * num_frames):
-            result = scheme_func(params)
-            results.append(result)
-
-        for _ in tqdm(pool.imap_unordered(scheme_func,
-                                          zip(it, med, [n] * num_frames,
-                                              [lam] * num_frames, [mpp] * num_frames,
-                                              [srv] * num_frames,
-                                              [sz] * num_frames, [numsteps] * num_frames,
-                                              [bpl] * num_frames, [bps] * num_frames,
-                                              [threshold] * num_frames, [pmd] * num_frames,
-                                              bg_image_array, use_bg)), total=num_frames):
-            results.append(_)
-
-        times.append(time() - t0)
-        pool.close()
-        pool.join()
+            print('Processing completed in', time() - t_start, 'seconds.')
 
         positions = pd.DataFrame(columns=['X', 'Y', 'Z', 'I_FS', 'I_GS', 'FRAME', 'TIME'])
 
-        for i in range(num_frames):
-
+        for i in range(len(results)):
             x = results[i][0][0]
             y = results[i][1][0]
             z = results[i][2][0]
@@ -185,7 +135,7 @@ def main():
             i_gs = results[i][4][0]
 
             frame = np.full_like(x, i)
-            time_values = frame / params[k]['FRAMERATE']
+            time_values = frame / float(values['-FRAME_COUNT-'])
 
             data_row = np.column_stack((x, y, z, i_fs, i_gs, frame, time_values))
             positions = pd.concat([positions, pd.DataFrame(data_row,
@@ -195,24 +145,18 @@ def main():
         positions = positions.astype('float')
         positions['TIME'] = positions['TIME'].round(3)
 
-        # Export CSV Files
-        if params[k]['EXPORT']:
-            path = os.path.split(path)[:-1][0]
-            pp = os.path.split(path)[-1][:-4]
-            scheme_suffix = 'RS' if params[k]['SCHEME'] == '-RS-' else 'MOD'
-            expath = f"{path}/{pp}_TH{params[k]['THRESHOLD']}_PMD{params[k]['PMD']}_SZ{params[k]['SZ']}_NUMSTEPS{params[k]['NUMSTEPS']}_{scheme_suffix}.csv"
-            positions.to_csv(expath)
+        # Export CSV if required
+        if params['export_csv']:
+            export_path = os.path.join(
+                os.path.split(video_path)[0],
+                f"{os.path.splitext(os.path.split(video_path)[-1])[0]}_{params['scheme']}.csv")
+            positions.to_csv(export_path, index=False)
+            print(f'Exported to: {export_path}')
 
-            print('Exported to:\n', expath)
-            print('-' * 150)
+            if OPEN_CSV_AFTER_EXPORT:
+                os.startfile(export_path)
 
-            if OPEN_FILE:
-                os.startfile(expath)
-
-        data.append(positions)
-
-    print('Done!')
-
+    print("Done.")
 
 if __name__ == '__main__':
     main()

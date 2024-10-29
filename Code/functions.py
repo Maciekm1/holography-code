@@ -520,7 +520,7 @@ def positions_batch_modified(TUPLE):
     return [X, Y, Z, I_FS, I_GS]
 
 
-def positions3D(GS, peak_min_distance, num_particles, MPP):
+def positions3D(GS, peak_min_distance, MPP,  num_particles='None'):
     """
     Find the 3D positions of particles in the gradient stack.
 
