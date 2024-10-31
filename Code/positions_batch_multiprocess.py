@@ -104,6 +104,22 @@ def main():
         params = processing_params[idx]
         scheme_function = func.positions_batch if params['scheme'] == '-RS-' else func.positions_batch_modified
 
+        ### --- Single core for debugging
+        # Run in single-core mode if needed for debugging
+        if False:  # Set to False to skip single-core execution
+            results = []
+            for i in range(frames_to_process):
+                res = scheme_function(tuple([
+                    frame_data[i], median_data[i], params['refractive_index'], params['wavelength'],
+                    params['magnification'], params['refocus_start'], params['step_size'],
+                    params['num_steps'], params['bp_large'], params['bp_small'], params['grad_threshold'],
+                    params['peak_min_dist'], bg_image, params['use_bg_image']
+                ]))
+                results.append(res)
+                print(f"Processed frame {i + 1}/{frames_to_process} in single-core mode")
+            # Use results here if you want to inspect them after each frame is processed
+        ### --- END
+
         with Pool(cpu_count()) as pool:
             t_start = time()
             print('-' * 150)

@@ -37,7 +37,8 @@ def bandpass_filter(img, xs, xl):
     SCO = np.exp(-((ii - MIS / 2) ** 2 + (jj - MIS / 2) ** 2) * (2 * xs / MIS) ** 2)
 
     # BP matches up with LabVIEW
-    BP = SCO - LCO
+    # TODO: I changed this from SCO - LCO to match up with LabVIEW - probably wrong?
+    BP = LCO - SCO
 
     # Applies fft shift to normalize BP? Does not match up with LabVIEW anymore
     BPP = np.fft.ifftshift(BP)
