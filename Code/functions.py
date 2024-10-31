@@ -5,7 +5,7 @@ from scipy import ndimage
 from scipy.ndimage import median_filter
 
 
-def bandpassFilter(img, xs, xl):
+def bandpass_filter(img, xs, xl):
     """
     Apply a bandpass filter to a grayscale image.
 
@@ -156,97 +156,118 @@ def bgPathToArray(image_path):
     return image_u8
 
 
-def rayleighSommerfeldPropagator(I, I_MEDIAN, N, LAMBDA, SRV, FS, SZ, NUMSTEPS, bandpass, med_filter,
-                                    BG_IMAGE,USE_BG, bp_smallest_px=4, bp_largest_px=60):
+def rayleigh_sommerfeld_propagator(
+        hologram, median_image, refractive_index, wavelength, start_refocus_value, sampling_freq,
+        step_size, num_steps, apply_bandpass, apply_median_filter, bg_image, use_bg_image,
+        bandpass_min_px=4, bandpass_max_px=60
+):
     """
     Rayleigh-Sommerfeld Back Propagator.
 
     Parameters:
     ----------
-    I : np.ndarray
-        Hologram (grayscale).
-    I_MEDIAN : np.ndarray
-        Median image.
-    N : float
+    hologram : np.ndarray
+        Grayscale hologram image.
+    median_image : np.ndarray
+        Median image for normalization.
+    refractive_index : float
         Index of refraction.
-    LAMBDA : float
-        Wavelength.
-    FS : float
-        Sampling Frequency px/um.
-    SZ : float
-        Step size.
-    NUMSTEPS : int
-        Number of steps in propagation.
-    bandpass : bool
+    wavelength : float
+        Wavelength in micrometers.
+    start_depth : float
+        Starting depth (refocus value).
+    sampling_freq : float
+        Sampling frequency in px/um.
+    step_size : float
+        Step size for depth increments.
+    num_steps : int
+        Number of depth steps to compute.
+    apply_bandpass : bool
         Whether to apply bandpass filtering.
-    med_filter : bool
+    apply_median_filter : bool
         Whether to apply median filtering.
+    bg_image : np.ndarray
+        Background image for normalization, if used.
+    use_bg_image : bool
+        Whether to use background image for normalization.
+    bandpass_min_px : int, optional
+        Minimum pixel size for bandpass filter (default is 4).
+    bandpass_max_px : int, optional
+        Maximum pixel size for bandpass filter (default is 60).
 
     Returns:
     -------
-    IZ : np.ndarray
-        3D array representing stack of images at different Z, where each "slice" along the third dimension represents
-        the reconstructed hologram at that particular depth (Z level).
+    reconstructed_stack : np.ndarray
+        3D array where each slice represents the reconstructed hologram at a specific depth.
     """
-    if USE_BG:
-        #TODO: Filter BG Image i.e. remove 0s
-        IN = I / BG_IMAGE
+
+    # Normalize hologram based on background or median image
+    if use_bg_image:
+        #TODO: Get rid of 0's in bg?
+        normalized_hologram = hologram / bg_image
     else:
-        I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
-        IN = I / I_MEDIAN
-        #print(I_MEDIAN.shape)
+        # Get rid of 0's
+        median_image[median_image == 0] = np.mean(median_image)
+        normalized_hologram = hologram / median_image
 
-    # Correct up to this point, Corresponds to  I/ bg_array division in LabVIEW, decrement + fft happens below in line 208
+    # Correct up to this point, Corresponds to  I/ bg_array division in LabVIEW,
+    # Update: decrement + fft happens below in fft_after_decrement variable i.e. code is correct/ matches up with
+    # LabVIEW up to fft_after_decrement, then it is shifted (fft.fftshift) to normalize and diverges from labVIEW code.
 
-    if med_filter:
-        IN = median_filter(IN, size=1)
+    # Apply median filtering if specified, currently not used, Should it be?
+    if apply_median_filter:
+        normalized_hologram = median_filter(normalized_hologram, size=1)
 
-    #  initial frequency spectrum of the hologram (E)
-    if bandpass:
-        _, BP = bandpassFilter(IN, bp_smallest_px, bp_largest_px)
-        fft_after_decrement = np.fft.fft2(IN - 1)
-        E = np.fft.fftshift(BP) * np.fft.fftshift(fft_after_decrement)
+    # Compute the initial frequency spectrum of the hologram
+    if apply_bandpass:
+        _, _bandpass_filter = bandpass_filter(normalized_hologram, bandpass_min_px, bandpass_max_px)
+        fft_after_decrement = np.fft.fft2(normalized_hologram - 1)
+        spectrum = np.fft.fftshift(_bandpass_filter) * np.fft.fftshift(fft_after_decrement)
     else:
-        E = np.fft.fftshift(np.fft.fft2(IN - 1))
+        spectrum = np.fft.fftshift(np.fft.fft2(normalized_hologram - 1))
+
+    # Set constants for propagation
+    img_height, img_width = normalized_hologram.shape
+
+    # depth_levels is an array representing depth values, beginning from SRV (start refocus value) and incrementing by
+    # step_size for num_steps steps.
+    depth_levels = start_refocus_value + (step_size * np.arange(num_steps))
+    wavenumber = 2 * np.pi * refractive_index / wavelength
+
+    # Generate spatial frequency grid
+    x_indices, y_indices = np.meshgrid(np.arange(img_width), np.arange(img_height))
+    spatial_constant = ((wavelength * sampling_freq) / (max(img_height, img_width) * refractive_index)) ** 2
+
+    # This effectively represents the spatial frequency squared at each point on the grid.
+    # It is offset by img_height / 2 and img_width / 2 to center the zero-frequency component.
+    spatial_freq_grid = spatial_constant * ((y_indices - img_height / 2) ** 2 + (x_indices - img_width / 2) ** 2)
+
+    # Normalize spatial frequency grid
+    if (spatial_freq_grid > 1).any():
+        spatial_freq_grid /= spatial_freq_grid.max()
+    spatial_freq_grid = np.conj(spatial_freq_grid)
+
+    # Calculate phase shift
+    # Since spatial_freq_grid was centered, phase_shift now contains phase shifts relative to the image center
+    phase_shift = np.sqrt(1 - spatial_freq_grid) - 1
+    if all(depth_levels >= 0):
+        phase_shift = np.conj(phase_shift)
+
+    # Initialize the output stack
+    reconstructed_stack = np.empty([img_height, img_width, depth_levels.shape[0]], dtype='float32')
+
+    # Calculate each depth slice
+    for k, depth in enumerate(depth_levels):
+        depth_phase_shift = np.exp(-1j * wavenumber * depth * phase_shift, dtype='complex64')
+
+        # Inverse FFT? (np.fft.ifft2)
+        reconstructed_slice = np.real(1 + np.fft.ifft2(np.fft.ifftshift(spectrum * depth_phase_shift)))
+        reconstructed_stack[:, :, k] = reconstructed_slice
+
+    return reconstructed_stack
 
 
-    LAMBDA = LAMBDA
-    FS = FS
-    NI, NJ = IN.shape
-
-    # Z is an array representing depth values, beginning from SRV (start refocus value) and incrementing by SZ for NUMSTEPS steps.
-    Z = SRV + (SZ * np.arange(0, NUMSTEPS))
-    K = 2 * np.pi * N / LAMBDA  # Wavenumber
-
-    jj, ii = np.meshgrid(np.arange(NJ), np.arange(NI))
-    const = ((LAMBDA * FS) / (max(NI, NJ) * N)) ** 2
-
-    # This effectively represents the spatial frequency squared at each point on the grid. It is offset by NI / 2 and NJ / 2 to center the zero-frequency component.
-    # spatial frequency grid (P)
-    P = const * ((ii - NI / 2) ** 2 + (jj - NJ / 2) ** 2)
-
-    if (P > 1).any():
-        P = P / P.max()
-
-    P = np.conj(P)
-
-    # represents the phase shift component based on the spatial frequencies. Since P was centered, Q now contains phase shifts relative to the image center
-    Q = np.sqrt(1 - P) - 1
-
-    if all(Z >= 0):
-        Q = np.conj(Q)
-
-    IZ = np.empty([NI, NJ, Z.shape[0]], dtype='float32')
-
-    # For each depth Z[k], R represents the phase shift operator at that depth.
-    for k in range(Z.shape[0]):
-        R = np.exp((-1j * K * Z[k] * Q), dtype='complex64')
-
-        #Inverse FFT
-        IZ[:, :, k] = np.real(1 + np.fft.ifft2(np.fft.ifftshift(E * R)))
-
-    return IZ
-
+# NOT USED IF USING BG IMAGE
 def medianImage(VID, num_frames):
     """
     Calculate the median image from a 3D numpy array of video frames.
@@ -273,43 +294,42 @@ def medianImage(VID, num_frames):
     return MEAN
 
 
-def zGradientStack(IM):
+def z_gradient_stack(image):
     """
-    Calculate the Z-gradient stack of an image. It highlights intensity changes along the Z-dimension.
+    Calculate the Z-gradient stack of a 3D image, emphasizing intensity changes along the Z-dimension.
 
     Parameters:
     ----------
-    IM : np.ndarray
-        Input image array.
+    image : np.ndarray
+        Input 3D image array.
 
     Returns:
     -------
-    GS : np.ndarray
-        3D array representing the gradient stack.
+    gradient_stack : np.ndarray
+        3D array representing the gradient stack along the Z-axis.
     """
 
-    # 3X3 Filter array, Sobel filter?
-    SZ0 = np.array([[-1, -2, -1], [-2, -4, -2], [-1, -2, -1]], dtype='float')
+    # Define 3x3 filter arrays for the Z-gradient computation, Sobel filter?
+    filter_front = np.array([[-1, -2, -1], [-2, -4, -2], [-1, -2, -1]], dtype='float')
+    filter_center = np.zeros_like(filter_front)
+    filter_back = -filter_front
 
-    SZ1 = np.zeros_like(SZ0)
-    SZ2 = -SZ0
+    # Stack filters along the third axis to form a 3D gradient filter
+    gradient_filter = np.stack((filter_front, filter_center, filter_back), axis=2)
 
-    # SZ is a 3D stack of filters, intended for convolution across the Z-dimension of the image, emphasizing changes (gradients) in intensity across the Z-depth of IM
-    SZ = np.stack((SZ0, SZ1, SZ2), axis=2)
+    # Pad the image along the Z-axis by duplicating the first and last slices
+    padded_image = np.dstack((image[:, :, 0][:, :, np.newaxis], image, image[:, :, -1][:, :, np.newaxis]))
 
-    # IMM is the IM array with extra slices added on both ends along the Z-axis
-    IMM = np.dstack((IM[:, :, 0][:, :, np.newaxis], IM, IM[:, :, -1][:, :, np.newaxis]))
+    # Convolve the padded image with the gradient filter to compute Z-gradient
+    gradient_stack = ndimage.convolve(padded_image, gradient_filter, mode='mirror')
 
-    # computing the gradient along Z for each pixel.
-    GS = ndimage.convolve(IMM, SZ, mode='mirror')
+    # Remove the padded slices added at the start and end along the Z-axis
+    gradient_stack = np.delete(gradient_stack, [0, gradient_stack.shape[2] - 1], axis=2)
 
-    # The first and last slices in GS (depth positions 0 and GS.shape[2] - 1) are removed,
-    # as they correspond to the padding added earlier.
-    GS = np.delete(GS, [0, GS.shape[2] - 1], axis=2)
-
-    return GS
+    return gradient_stack
 
 
+# NOT USED - NOT SURE IF USEFUL?
 def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter):
     """
     Modified Propagator.
@@ -349,7 +369,7 @@ def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_
 
     # Bandpass Filter
     if bandpass:
-        _, BP = bandpassFilter(IN, 2, 30)
+        _, BP = bandpass_filter(IN, 2, 30)
         E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
     else:
         E = np.fft.fftshift(np.fft.fft2(IN - 1))
@@ -426,16 +446,16 @@ def positions_batch(params):
     x_coords, y_coords, z_coords, intensity_fs, intensity_gs = [], [], [], [], []
 
     # Processing
-    propagated_image = rayleighSommerfeldPropagator(
+    propagated_image = rayleigh_sommerfeld_propagator(
         hologram, median_img, ref_index, wavelength, start_refocus,
         scale_factor, step_size, num_steps, True, False, bg_image, use_bg_image,
-        bp_largest_px=bandpass_max_px, bp_smallest_px=bandpass_min_px
+        bandpass_max_px, bandpass_min_px
     ).astype('float32')
 
-    grad_stack = zGradientStack(propagated_image).astype('float32')
+    grad_stack = z_gradient_stack(propagated_image).astype('float32')
     grad_stack[grad_stack < threshold] = 0
 
-    locs[0, 0] = positions3D(grad_stack, peak_min_distance=peak_min_distance, MPP=magnification)
+    locs[0, 0] = find_3d_positions(grad_stack, peak_min_distance, magnification)
     coords = locs[0, 0].astype('int')
 
     locs[0, 1] = propagated_image[coords[:, 0], coords[:, 1], coords[:, 2]]
@@ -451,6 +471,7 @@ def positions_batch(params):
     return [x_coords, y_coords, z_coords, intensity_fs, intensity_gs]
 
 
+# NOT USED - NOT SURE IF USEFUL?
 def positions_batch_modified(TUPLE):
     """
     Process a modified batch of positions from the input tuple.
@@ -497,7 +518,7 @@ def positions_batch_modified(TUPLE):
     GS = modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, True)
     GS[GS < THRESHOLD] = 0
 
-    LOCS[0, 0] = positions3D(GS, peak_min_distance=PMD, num_particles='None', MPP=MPP)
+    LOCS[0, 0] = find_3d_positions(GS, PMD, MPP, -1)
     A = LOCS[0, 0].astype('int')
 
     LOCS[0, 1] = GS[A[:, 0], A[:, 1], A[:, 2]]
@@ -512,20 +533,20 @@ def positions_batch_modified(TUPLE):
     return [X, Y, Z, I_FS, I_GS]
 
 
-def positions3D(GS, peak_min_distance, MPP,  num_particles=-1):
+def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_particles=-1):
     """
     Find the 3D positions of particles in the gradient stack.
 
     Parameters:
     ----------
-    GS : np.ndarray
-        3D Gradient Stack.
-    peak_min_distance : float
-        Minimum distance between peaks.
-    num_particles : int
-        Number of particles to detect; -1 for no limit.
-    MPP : float
-        Magnification
+    gradient_stack : np.ndarray
+        3D gradient stack.
+    min_peak_distance : float
+        Minimum distance between peaks in the 2D maximum projection.
+    magnification : float
+        Magnification factor
+    num_particles : int, optional
+        Number of particles to detect; -1 to detect all peaks. Default is -1.
 
     Returns:
     -------
@@ -533,87 +554,66 @@ def positions3D(GS, peak_min_distance, MPP,  num_particles=-1):
         2D array with particle positions (x, y in pixels, z in slice number).
     """
 
-    # compresses the 3D gradient stack GS into a 2D representation of maximum values along the depth axis
-    ZP = np.max(GS, axis=-1)
+    # Compresses the 3D gradient stack GS into a 2D representation of maximum values along the depth axis
+    max_projection = np.max(gradient_stack, axis=-1)
 
+    # Detect peak positions in the 2D projection
     # If num_particles is specified, only that many peaks are kept; if num_particles is set to -1,
     # all peaks above a certain threshold are kept.
-    # The result PKS is a list of (x, y) coordinates of detected peaks.
+    # The result peak_positions is a list of (x, y) coordinates of detected peaks.
     if num_particles == -1:
-        PKS = peak_local_max(ZP, min_distance=peak_min_distance)
-    elif num_particles > 0:
-        PKS = peak_local_max(ZP, min_distance=peak_min_distance, num_peaks=num_particles)
+        peak_positions = peak_local_max(max_projection, min_distance=min_peak_distance)
+    else:
+        peak_positions = peak_local_max(max_projection, min_distance=min_peak_distance, num_peaks=num_particles)
 
-    # D1 and D2 define the size of the neighborhood around each detected peak
-    D1 = int(MPP / 10)
-    D2 = int(MPP / 10)
-    Z_SUM_XY = np.empty((GS.shape[2], len(PKS)))
+    # Define neighborhood dimensions based on magnification
+    # TODO: should magnification be in MPP? It is currently 40x (i.e. the float '40')
+    neighborhood_radius_x = int(magnification / 10)
+    neighborhood_radius_y = int(magnification / 10)
+    z_intensity_sum = np.empty((gradient_stack.shape[2], len(peak_positions)))
 
-    ### Accumulate Gradient Sums in Z-Direction for Each Peak -
+    # Sum intensities around each detected peak in the Z-dimension
+    for idx, (peak_x, peak_y) in enumerate(peak_positions):
+        sub_region = gradient_stack[
+            peak_x - neighborhood_radius_x : peak_x + neighborhood_radius_y,
+            peak_y - neighborhood_radius_x : peak_y + neighborhood_radius_y,
+            :
+        ]
+        z_intensity_sum[:, idx] = np.sum(sub_region, axis=(0, 1))
 
-    # This loop extracts a small subarray A around each peak position (idi, idj) in GS
-    # np.sum(A, axis=(0, 1)) calculates the summed intensities across the (x, y) neighborhood for each Z-slice. These sums highlight the Z-locations where the particle is most prominent.
-    for ii in range(len(PKS)):
-        idi, idj = PKS[ii]
-        A = GS[idi - D1:idi + D2, idj - D1:idj + D2, :]
-        Z_SUM_XY[:, ii] = np.sum(A, axis=(0, 1))
+    # Store Z-locations corresponding to maximum intensity for each peak
+    z_max_positions_folded = np.empty((len(peak_positions), 1), dtype=object)
+    for idx in range(len(peak_positions)):
+        max_z_locations = peak_local_max(z_intensity_sum[:, idx], num_peaks=1)
+        z_max_positions_folded[idx, 0] = max_z_locations if max_z_locations.size else np.array([[0]])
 
+    # Flatten Z-locations into a simple list
+    z_max_positions = [
+        [z.item()] if len(z) == 1 else [z.item() for z in z]
+        for z in z_max_positions_folded[:, 0]
+    ]
+    z_max_positions = np.array(z_max_positions)
 
-    Z_SUM_XY_MAXS_FOLDED = np.empty((len(PKS), 1), dtype=object)
+    # Refine Z-positions using quadratic fitting
+    fit_width = 2
+    quadratic_fn = lambda a, x: a[0] * x ** 2 + a[1] * x + a[2]
+    refined_z_positions = []
 
-    ### Identify Z-Locations of Maximum Gradient Sums
+    for z_pos in z_max_positions:
+        z_index = z_pos[0]
+        z_neighborhood = np.arange(z_index - fit_width, z_index + fit_width + 1)
+        padded_intensity_sum = np.pad(z_intensity_sum, ((fit_width, fit_width), (0, 0)))
+        intensity_values = padded_intensity_sum[z_neighborhood + fit_width, len(refined_z_positions)]
 
-    # Z_SUM_XY_MAXS_FOLDED stores the Z positions corresponding to the maximum intensity for each particle, using peak_local_max on the summed intensity values in Z_SUM_XY
-    for ii in range(len(PKS)):
-        Z_SUM_XY_MAXS_FOLDED[ii, 0] = peak_local_max(Z_SUM_XY[:, ii], num_peaks=1)
-        if Z_SUM_XY_MAXS_FOLDED[ii, 0].size == 0:
-            Z_SUM_XY_MAXS_FOLDED[ii, 0] = np.array([[0]])
+        # Quadratic fitting for sub-pixel Z-position refinement
+        coefficients = np.polyfit(z_neighborhood, intensity_values, 2)
+        interpolated_z = np.linspace(z_neighborhood[0], z_neighborhood[-1], 10)
+        interpolated_values = quadratic_fn(coefficients, interpolated_z)
 
+        max_index = np.argmax(interpolated_values)
+        refined_z_positions.append(interpolated_z[max_index])
 
-    ### Flatten and Organize Z-Positions -
+    # Combine 2D (x, y) positions with refined Z positions into 3D (x, y, z)
+    particle_positions_3d = np.insert(np.float16(peak_positions), 2, refined_z_positions, axis=-1)
 
-    Z_SUM_XY_MAXS = []
-
-    # This part ensures Z_SUM_XY_MAXS is organized as a flat list of Z positions, with each entry corresponding to one particle’s Z-coordinate.
-    for ii in range(len(Z_SUM_XY_MAXS_FOLDED)):
-        if len(Z_SUM_XY_MAXS_FOLDED[ii, 0]) != 1:
-            for jj in range(len(Z_SUM_XY_MAXS_FOLDED[ii, 0])):
-                Z_SUM_XY_MAXS.append([Z_SUM_XY_MAXS_FOLDED[ii, 0][jj].item()])
-        else:
-            Z_SUM_XY_MAXS.append([Z_SUM_XY_MAXS_FOLDED[ii, 0].item()])
-
-    Z_SUM_XY_MAXS = np.array(Z_SUM_XY_MAXS)
-
-
-
-    ### Refine Z-Positions Using Quadratic Fitting
-
-    w = 2
-
-    # A quadratic function pol is defined to fit a small region of Z positions around each particle’s maximum gradient sum.
-    pol = lambda a, x: a[0] * x ** 2 + a[1] * x + a[2]
-    z_max = []
-
-    # For each particle, the surrounding values are used to fit a polynomial curve (np.polyfit).
-    # This quadratic fit helps refine the exact Z-position with sub-slice accuracy by interpolating between slices
-    for j in range(len(Z_SUM_XY_MAXS)):
-        i = Z_SUM_XY_MAXS[j][0]
-        idi = np.arange(i - w, i + w + 1)
-        temp = np.pad(Z_SUM_XY, ((w, w), (0, 0)))
-        val = temp[idi + w, j]
-
-        coefs = np.polyfit(idi, val, 2)
-
-        interp_idi = np.linspace(idi[0], idi[-1], 10)
-        interp_val = pol(coefs, interp_idi)
-
-        idi_max = np.where(interp_val == interp_val.max())[0][0]
-        z_max.append(interp_idi[idi_max])
-
-
-    # PKS contains the (x, y) coordinates of each particle in pixels, while z_max holds the interpolated Z-coordinates.
-    # YXZ_POSITIONS combines these to produce a 2D array with each row representing a particle's 3D position
-    # in (x, y, z) format.
-    YXZ_POSITIONS = np.insert(np.float16(PKS), 2, z_max, axis=-1)
-
-    return YXZ_POSITIONS  # (x,y) in pixels, z in slice number
+    return particle_positions_3d  # Returns (x, y in pixels, z in slice number)
