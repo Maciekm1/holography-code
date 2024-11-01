@@ -4,7 +4,7 @@
 Holographic Coordinate Detection Script with Progress Bar
 
 Original Author: Erick
-Modified by: Maciek (October 18, 2024)
+Modified by: Maciek (October 31, 2024)
 """
 
 import os
@@ -56,6 +56,7 @@ def main():
             break
         elif event == 'Add Video':
             print(f'Added {os.path.split(values["-VIDEO-"])[-1]} to queue.')
+
             #--- TEMP FOR DEBUGGING
             #paths.append(values['-FILE-'])
             #bg_paths.append(values['-BGIMAGE-'])
@@ -64,6 +65,7 @@ def main():
             bg_image_paths.append(
                 r"C:\Users\mz1794\Downloads\Python and Viking DHM port\1024bg.png")
             #---
+
             scheme = '-RS-' if values['-RS-'] else '-MOD-'
             processing_params.append({
                 'refractive_index': float(values['-REFRACTIVE_INDEX-']),
@@ -86,7 +88,9 @@ def main():
 
     window.close()
 
-    # Process each video file
+    ### Processing Start
+
+    # Process each video file that was added through GUI
     for idx, video_path in enumerate(video_paths):
         video_data = func.videoImport(video_path, 0)
         bg_image = func.bgPathToArray(bg_image_paths[idx])
@@ -95,13 +99,18 @@ def main():
         if processing_params[idx]['invert_video']:
             video_data = video_data.max() - video_data
 
+        # Currently only using BG_Image normalization -> Median frame is not used
         median_frame = func.medianImage(video_data, 20)
+
         frames_to_process = processing_params[idx]['frame_count'] or total_frames
 
+        # Create a list of {framerate} items. Each item is a 2D array of x, y coordinates of that frame.
         frame_data = [video_data[i, :, :] for i in range(frames_to_process)]
         median_data = [median_frame] * frames_to_process
 
         params = processing_params[idx]
+
+        # Select function to run for frame processing, based on GUI Input.
         scheme_function = func.positions_batch if params['scheme'] == '-RS-' else func.positions_batch_modified
 
         ### --- Single core for debugging
@@ -120,12 +129,14 @@ def main():
             # Use results here if you want to inspect them after each frame is processed
         ### --- END
 
+        ### Parallel Processing Start
         with Pool(cpu_count()) as pool:
             t_start = time()
             print('-' * 150)
             print(f'Processing file {idx + 1}/{len(video_paths)}: {os.path.split(video_path)[-1]}')
 
             # Execute batch processing in parallel with progress bar
+            # This runs scheme_function on each frame with corresponding parameters.
             results = []
             with tqdm(total=frames_to_process, desc="Processing Frames", unit="frame") as progress_bar:
                 for res in pool.imap_unordered(scheme_function, zip(
@@ -143,6 +154,8 @@ def main():
 
         positions = pd.DataFrame(columns=['X', 'Y', 'Z', 'I_FS', 'I_GS', 'FRAME', 'TIME'])
 
+        ### Collect Results
+
         for i in range(len(results)):
             x = results[i][0][0]
             y = results[i][1][0]
@@ -153,6 +166,8 @@ def main():
             frame = np.full_like(x, i)
             time_values = frame / float(values['-FRAME_COUNT-'])
 
+            ### Organize Results
+
             data_row = np.column_stack((x, y, z, i_fs, i_gs, frame, time_values))
             positions = pd.concat([positions, pd.DataFrame(data_row,
                                                            columns=['X', 'Y', 'Z', 'I_FS', 'I_GS', 'FRAME', 'TIME'])],
@@ -160,6 +175,8 @@ def main():
 
         positions = positions.astype('float')
         positions['TIME'] = positions['TIME'].round(3)
+
+        ### Output results
 
         # Export CSV if required
         if params['export_csv']:

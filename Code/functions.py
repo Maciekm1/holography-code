@@ -213,7 +213,7 @@ def rayleigh_sommerfeld_propagator(
 
     # Correct up to this point, Corresponds to  I/ bg_array division in LabVIEW,
     # Update: decrement + fft happens below in fft_after_decrement variable i.e. code is correct/ matches up with
-    # LabVIEW up to fft_after_decrement, then it is shifted (fft.fftshift) to normalize and diverges from labVIEW code.
+    # LabVIEW up to fft_after_decrement - then it is shifted (fft.fftshift) to normalize and diverges from labVIEW code.
 
     # Apply median filtering if specified, currently not used, Should it be?
     if apply_median_filter:

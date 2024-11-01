@@ -3,13 +3,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # TODO - LabVIEW doesn't process/ save last frame??? frame 49 exists in python output but not in labVIEW
-# -1 for all frames
+# -1 for all frames, a number for specific frame
 FRAME = -1
 PYTHON_3D_DATA_PATH = r'C:/Users/mz1794/Downloads/Python and Viking DHM port\40x_100Hz_1081_CHO_1_T5_detrend_frame0-50_-RS-.csv'
 
 # 'frames' folder
 LABVIEW_3D_DATA_FOLDER_PATH = r"C:\Users\mz1794\Downloads\Python and Viking DHM port\frames"
-# which file to choose in 'frames' folder, without .txt or frame number (i.e. 00000/00001...)
+
+# which file to choose in 'frames' folder, without .txt or frame number (i.e. without 00000/00001...)
 LABVIEW_FILE_NAME = "40x_100Hz_1081_CHO_1_T5_detrend_frame0-50_frame"
 
 def main():
@@ -25,6 +26,7 @@ def main():
     plot_expected_3d_positions_from_folder(fig ,LABVIEW_3D_DATA_FOLDER_PATH,122, FRAME)
 
     plt.show()
+
 
 def plot_3d_positions(fig, subplot_pos, frame=-1):
     data = pd.read_csv(
