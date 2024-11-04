@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 from skimage.feature import peak_local_max
@@ -38,7 +39,7 @@ def bandpass_filter(img, xs, xl):
 
     # BP matches up with LabVIEW
     # TODO: I changed this from SCO - LCO to match up with LabVIEW - probably wrong?
-    BP = LCO - SCO
+    BP = SCO - LCO
 
     # Applies fft shift to normalize BP? Does not match up with LabVIEW anymore
     BPP = np.fft.ifftshift(BP)
@@ -160,7 +161,7 @@ def bgPathToArray(image_path):
 def rayleigh_sommerfeld_propagator(
         hologram, median_image, refractive_index, wavelength, start_refocus_value, sampling_freq,
         step_size, num_steps, apply_bandpass, apply_median_filter, bg_image, use_bg_image,
-        bandpass_min_px=4, bandpass_max_px=60
+        bandpass_min_px=4, bandpass_max_px=60, frame_number=0
 ):
     """
     Rayleigh-Sommerfeld Back Propagator.
@@ -202,6 +203,7 @@ def rayleigh_sommerfeld_propagator(
         3D array where each slice represents the reconstructed hologram at a specific depth.
     """
 
+    export_frame(hologram, "hologram", frame_number)
     # Normalize hologram based on background or median image
     if use_bg_image:
         #TODO: Get rid of 0's in bg?
@@ -210,6 +212,7 @@ def rayleigh_sommerfeld_propagator(
         # Get rid of 0's
         median_image[median_image == 0] = np.mean(median_image)
         normalized_hologram = hologram / median_image
+    export_frame(normalized_hologram, "normalized", frame_number)
 
     # Correct up to this point, Corresponds to  I/ bg_array division in LabVIEW,
     # Update: decrement + fft happens below in fft_after_decrement variable i.e. code is correct/ matches up with
@@ -224,6 +227,7 @@ def rayleigh_sommerfeld_propagator(
         _, _bandpass_filter = bandpass_filter(normalized_hologram, bandpass_min_px, bandpass_max_px)
         fft_after_decrement = np.fft.fft2(normalized_hologram - 1)
         spectrum = np.fft.fftshift(_bandpass_filter) * np.fft.fftshift(fft_after_decrement)
+        export_frame(spectrum, "bandpass_filtered_spectrum", frame_number)
     else:
         spectrum = np.fft.fftshift(np.fft.fft2(normalized_hologram - 1))
 
@@ -264,6 +268,7 @@ def rayleigh_sommerfeld_propagator(
         # Inverse FFT? (np.fft.ifft2)
         reconstructed_slice = np.real(1 + np.fft.ifft2(np.fft.ifftshift(spectrum * depth_phase_shift)))
         reconstructed_stack[:, :, k] = reconstructed_slice
+        export_frame(reconstructed_slice, f"reconstructed_depth_{depth:.2f}", frame_number)
 
     return reconstructed_stack
 
@@ -326,6 +331,10 @@ def z_gradient_stack(image):
 
     # Remove the padded slices added at the start and end along the Z-axis
     gradient_stack = np.delete(gradient_stack, [0, gradient_stack.shape[2] - 1], axis=2)
+
+    # Export the gradient stack for visualization
+    for frame_number in range(gradient_stack.shape[2]):
+        export_frame(gradient_stack[:, :, frame_number], "gradient_stack", frame_number)
 
     return gradient_stack
 
@@ -558,6 +567,9 @@ def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_part
     # Compresses the 3D gradient stack GS into a 2D representation of maximum values along the depth axis
     max_projection = np.max(gradient_stack, axis=-1)
 
+    # Export the maximum projection for visualization
+    export_frame(max_projection, "max_projection", 0)
+
     # Detect peak positions in the 2D projection
     # If num_particles is specified, only that many peaks are kept; if num_particles is set to -1,
     # all peaks above a certain threshold are kept.
@@ -618,3 +630,26 @@ def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_part
     particle_positions_3d = np.insert(np.float16(peak_positions), 2, refined_z_positions, axis=-1)
 
     return particle_positions_3d  # Returns (x, y in pixels, z in slice number)
+
+
+def export_frame(image, step_name, frame_number, output_dir="processed_frames"):
+    """
+    Export a frame to an image file for visualization of processing steps.
+
+    Parameters:
+    ----------
+    image : np.ndarray
+        Image array to save.
+    step_name : str
+        Descriptive name of the processing step.
+    frame_number : int
+        Frame number in the sequence.
+    output_dir : str
+        Directory where the frames will be saved.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    file_name = f"{step_name}_frame{frame_number}.png"
+    file_path = os.path.join(output_dir, file_name)
+    cv2.imwrite(file_path, (image * 255).astype(np.uint8))

@@ -4,7 +4,7 @@ import pandas as pd
 
 # TODO - LabVIEW doesn't process/ save last frame??? frame 49 exists in python output but not in labVIEW
 # -1 for all frames, a number for specific frame
-FRAME = -1
+FRAME = 1
 PYTHON_3D_DATA_PATH = r'C:/Users/mz1794/Downloads/Python and Viking DHM port\40x_100Hz_1081_CHO_1_T5_detrend_frame0-50_-RS-.csv'
 
 # 'frames' folder

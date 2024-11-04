@@ -115,7 +115,7 @@ def main():
 
         ### --- Single core for debugging
         # Run in single-core mode if needed for debugging
-        if False:  # Set to False to skip single-core execution
+        if True:  # Set to False to skip single-core execution
             results = []
             for i in range(frames_to_process):
                 res = scheme_function(tuple([
