@@ -4,7 +4,10 @@ import numpy as np
 from skimage.feature import peak_local_max
 from scipy import ndimage
 from scipy.ndimage import median_filter
+import matplotlib.pyplot as plt
 
+# If True, will export png images at key points of the algorithm to the specified dir --for debugging
+EXPORT_FRAME_IMAGES = False
 
 def bandpass_filter(img, xs, xl):
     """
@@ -203,7 +206,8 @@ def rayleigh_sommerfeld_propagator(
         3D array where each slice represents the reconstructed hologram at a specific depth.
     """
 
-    export_frame(hologram, "hologram", frame_number)
+    if EXPORT_FRAME_IMAGES:
+        export_frame(hologram, "hologram", frame_number)
 
     # Normalize hologram based on background or median image
     if use_bg_image:
@@ -213,7 +217,9 @@ def rayleigh_sommerfeld_propagator(
         # Get rid of 0's
         median_image[median_image == 0] = np.mean(median_image)
         normalized_hologram = hologram / median_image
-    export_frame(normalized_hologram, "normalized", frame_number)
+
+    if EXPORT_FRAME_IMAGES:
+        export_frame(normalized_hologram, "normalized", frame_number)
 
     # Correct up to this point, Corresponds to  I/ bg_array division in LabVIEW,
     # Update: decrement + fft happens below in fft_after_decrement variable i.e. code is correct/ matches up with
@@ -228,8 +234,9 @@ def rayleigh_sommerfeld_propagator(
         _, _bandpass_filter = bandpass_filter(normalized_hologram, bandpass_min_px, bandpass_max_px)
         fft_after_decrement = np.fft.fft2(normalized_hologram - 1)
         spectrum = np.fft.fftshift(_bandpass_filter) * np.fft.fftshift(fft_after_decrement)
-        export_frame(spectrum, "bandpass_filtered_spectrum", frame_number)
-        export_frame(np.fft.ifft2(spectrum), 'bandpass_filtered_spectrum_ifft', frame_number)
+        if EXPORT_FRAME_IMAGES:
+            export_frame(spectrum, "bandpass_filtered_spectrum", frame_number)
+            export_frame(np.fft.ifft2(spectrum), 'bandpass_filtered_spectrum_ifft', frame_number)
     else:
         spectrum = np.fft.fftshift(np.fft.fft2(normalized_hologram - 1))
 
@@ -270,7 +277,9 @@ def rayleigh_sommerfeld_propagator(
         # Inverse FFT? (np.fft.ifft2)
         reconstructed_slice = np.real(1 + np.fft.ifft2(np.fft.ifftshift(spectrum * depth_phase_shift)))
         reconstructed_stack[:, :, k] = reconstructed_slice
-        export_frame(reconstructed_slice, f"reconstructed_depth_{depth:.2f}", frame_number)
+
+        if EXPORT_FRAME_IMAGES:
+            export_frame(reconstructed_slice, f"reconstructed_depth_{depth:.2f}", frame_number)
 
     return reconstructed_stack
 
@@ -335,8 +344,9 @@ def z_gradient_stack(image):
     gradient_stack = np.delete(gradient_stack, [0, gradient_stack.shape[2] - 1], axis=2)
 
     # Export the gradient stack for visualization
-    for frame_number in range(gradient_stack.shape[2]):
-        export_frame(gradient_stack[:, :, frame_number], "gradient_stack", frame_number)
+    if EXPORT_FRAME_IMAGES:
+        for frame_number in range(gradient_stack.shape[2]):
+            export_frame(gradient_stack[:, :, frame_number], "gradient_stack", frame_number)
 
     return gradient_stack
 
@@ -545,7 +555,7 @@ def positions_batch_modified(TUPLE):
     return [X, Y, Z, I_FS, I_GS]
 
 
-def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_particles=-1):
+def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_particles=160):
     """
     Find the 3D positions of particles in the gradient stack.
 
@@ -569,8 +579,9 @@ def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_part
     # Compresses the 3D gradient stack GS into a 2D representation of maximum values along the depth axis
     max_projection = np.max(gradient_stack, axis=-1)
 
-    # Export the maximum projection for visualization
-    export_frame(max_projection, "max_projection", 0)
+    if EXPORT_FRAME_IMAGES:
+        # Export the maximum projection for visualization
+        export_frame(max_projection, "max_projection", 0)
 
     # Detect peak positions in the 2D projection
     # If num_particles is specified, only that many peaks are kept; if num_particles is set to -1,
@@ -580,6 +591,17 @@ def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_part
         peak_positions = peak_local_max(max_projection, min_distance=min_peak_distance)
     else:
         peak_positions = peak_local_max(max_projection, min_distance=min_peak_distance, num_peaks=num_particles)
+
+    # Display the maximum projection image
+    plt.imshow(max_projection, cmap='gray')
+    plt.scatter(peak_positions[:, 1], peak_positions[:, 0], color='red', marker='x')
+    plt.title('2D Maximum Projection with Peak Positions')
+
+    # Save the plot as a PNG file
+    plt.savefig('2D_max_projection_with_peaks.png', format='png')
+
+    # Clear the plot if you’re creating multiple images in a loop or in sequence
+    plt.clf()
 
     # Define neighborhood dimensions based on magnification
     # TODO: should magnification be in MPP? It is currently 40x (i.e. the float '40')

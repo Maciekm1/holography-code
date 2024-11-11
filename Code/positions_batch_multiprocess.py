@@ -36,7 +36,7 @@ def main():
         [sg.Text('Largest Bandpass Filter (px)', size=(35, 1)), sg.InputText(default_text=60, key='-BP_LARGE-')],
         [sg.Text('Smallest Bandpass Filter (px)', size=(35, 1)), sg.InputText(default_text=4, key='-BP_SMALL-')],
         [sg.Text('Gradient Stack Threshold (~0.1)', size=(35, 1)), sg.InputText(default_text=0.002, key='-GRAD_THRESHOLD-')],
-        [sg.Text('Peak Minimum Distance (px)', size=(35, 1)), sg.InputText(default_text=20, key='-PEAK_MIN_DIST-')],
+        [sg.Text('Peak Minimum Distance (px)', size=(35, 1)), sg.InputText(default_text=2, key='-PEAK_MIN_DIST-')],
         [sg.Text('Frame Rate (fps)', size=(35, 1)), sg.InputText(default_text=50, key='-FRAME_RATE-')],
         [sg.Checkbox('Use Background Image', default=True, key='-USE_BG-')],
         [sg.Checkbox('Invert Video', default=False, key='-INVERT_VIDEO-')],
@@ -115,7 +115,7 @@ def main():
 
         ### --- Single core for debugging
         # Run in single-core mode if needed for debugging
-        if True:  # Set to False to skip single-core execution
+        if False:  # Set to False to skip single-core execution
             results = []
             for i in range(frames_to_process):
                 res = scheme_function(tuple([
