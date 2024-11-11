@@ -204,6 +204,7 @@ def rayleigh_sommerfeld_propagator(
     """
 
     export_frame(hologram, "hologram", frame_number)
+
     # Normalize hologram based on background or median image
     if use_bg_image:
         #TODO: Get rid of 0's in bg?
@@ -228,6 +229,7 @@ def rayleigh_sommerfeld_propagator(
         fft_after_decrement = np.fft.fft2(normalized_hologram - 1)
         spectrum = np.fft.fftshift(_bandpass_filter) * np.fft.fftshift(fft_after_decrement)
         export_frame(spectrum, "bandpass_filtered_spectrum", frame_number)
+        export_frame(np.fft.ifft2(spectrum), 'bandpass_filtered_spectrum_ifft', frame_number)
     else:
         spectrum = np.fft.fftshift(np.fft.fft2(normalized_hologram - 1))
 
