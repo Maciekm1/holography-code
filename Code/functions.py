@@ -429,7 +429,7 @@ def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_
 def positions_batch(params):
     """
     Process a batch of positions from the input tuple. The tuple corresponds to a single frame of .avi file.
-    This function will be called on different processors with a different tuple (frame) each time.
+    This function will be called on different cores with a different tuple (frame) each time.
 
     Parameters:
     ----------

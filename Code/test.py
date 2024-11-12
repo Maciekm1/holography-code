@@ -40,9 +40,10 @@ def plot_3d_positions(fig, subplot_pos, frame=-1):
 
     print('python datapoints: ' + str(len(data)))
 
+    # TODO - SWAP BACK X/Y COORDS. FIX PYTHON?
     # Extract x, y, z coordinates
-    x = data['X']
-    y = data['Y']
+    x = data['Y']
+    y = data['X']
     z = data['Z']
 
     # Create a 3D plot
