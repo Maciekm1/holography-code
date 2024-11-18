@@ -48,7 +48,7 @@ def bandpass_filter(image, small_cutoff, large_cutoff):
     large_cutoff_filter = np.exp(-distance_squared * (2 * large_cutoff / height) ** 2)
     small_cutoff_filter = np.exp(-distance_squared * (2 * small_cutoff / height) ** 2)
 
-    ### BP matches up with LabVIEW
+    ### Bandpass_filter matches up with LabVIEW
     # Create the bandpass filter
     bandpass_filter = small_cutoff_filter - large_cutoff_filter
     # bandpass_filter = small_cutoff_filter * (1 - large_cutoff_filter)
@@ -665,7 +665,7 @@ def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_part
     return particle_positions_3d  # Returns (x, y in pixels, z in slice number)
 
 
-def export_frame(image, step_name, frame_number, output_dir="processed_frames"):
+def export_frame(image, step_name, frame_number, output_dir="processed_frames_images"):
     """
     Export a frame to an image file for visualization of processing steps.
 

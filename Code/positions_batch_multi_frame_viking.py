@@ -52,26 +52,26 @@ def main():
     main_processing(video_paths, bg_image_paths, processing_params)
 
 
-def main_processing(video_paths, bg_image_paths, processing_params):
+# TODO - Rewrite so only processes one frame at a time, and outputs 1 .txt file for that frame.
+def main_processing(video_path, bg_image_path, processing_params):
     # Process each video file that was added
-    for idx, video_path in enumerate(video_paths):
         video_data = func.videoImport(video_path, 0)
-        bg_image = func.bgPathToArray(bg_image_paths[idx])
+        bg_image = func.bgPathToArray(bg_image_path)
         total_frames = video_data.shape
 
-        if processing_params[idx]["invert_video"]:
+        if processing_params["invert_video"]:
             video_data = video_data.max() - video_data
 
         # Currently only using BG_Image normalization -> Median frame is not used
         median_frame = func.medianImage(video_data, 20)
 
-        frames_to_process = processing_params[idx]["frame_count"] or total_frames
+        frames_to_process = processing_params["frame_count"] or total_frames
 
         # Create a list of {framerate} items. Each item is a 2D array of x, y coordinates of that frame.
         frame_data = [video_data[i, :, :] for i in range(frames_to_process)]
         median_data = [median_frame] * frames_to_process
 
-        params = processing_params[idx]
+        params = processing_params
 
         # Select function to run for frame processing, based on GUI Input.
         scheme_function = (
@@ -83,10 +83,6 @@ def main_processing(video_paths, bg_image_paths, processing_params):
         ### Parallel Processing Start
         with Pool(cpu_count()) as pool:
             t_start = time()
-            print("-" * 150)
-            print(
-                f"Processing file {idx + 1}/{len(video_paths)}: {os.path.split(video_path)[-1]}"
-            )
 
             # Execute batch processing in parallel with progress bar
             # This runs scheme_function on each frame with corresponding parameters.
@@ -163,9 +159,9 @@ def main_processing(video_paths, bg_image_paths, processing_params):
             positions.to_csv(export_path, index=False)
             print(f"Exported to: {export_path}")
 
-    print("Done.")
+        print("Done.")
 
-
+# TODO - Rewrite to create parameter files from spreadsheet.
 def load_params_from_spreadsheet(spreadsheet_path):
     # Load spreadsheet
     data = pd.read_excel(spreadsheet_path, header=1)

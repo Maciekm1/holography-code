@@ -1,0 +1,19 @@
+{
+    "bg_image_path": "C:\\Users\\mz1794\\Downloads\\Python and Viking DHM port\\1024bg.png",
+    "refractive_index": 1.3326,
+    "wavelength": 0.642,
+    "magnification": 40.0,
+    "refocus_start": 0,
+    "step_size": 3.0,
+    "num_steps": 30,
+    "bp_large": 60,
+    "bp_small": 4,
+    "grad_threshold": 0.002,
+    "peak_min_dist": 2,
+    "frame_rate": 50,
+    "use_bg_image": true,
+    "invert_video": false,
+    "export_csv": true,
+    "frame_count": 50,
+    "scheme": "-RS-"
+}
