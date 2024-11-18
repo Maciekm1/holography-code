@@ -1,0 +1,3 @@
+[run]
+source = Code
+omit = **/config-3.py

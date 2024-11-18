@@ -12,11 +12,13 @@ RAYLEIGH_SOMMERFELD_PROPAGATOR = True
 FRAME_COUNT = 50
 EXPORT_CSV = True
 INVERT_VIDEO = False
+
+#Default path - used if not provided as an argument
 SPREADSHEET_PATH = r'C:\Users\mz1794\Downloads\Python and Viking DHM port\CSV\2024-01-24 - part 1 - videos to frames_subset_Maciek.xlsx'
 
 
 def main():
-    # Use the provided spreadsheet path or the default path
+    # Use the provided spreadsheet path or the default path above
     spreadsheet_path = sys.argv[1] if len(sys.argv) > 1 else SPREADSHEET_PATH
 
     processing_params = []

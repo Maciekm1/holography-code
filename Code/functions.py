@@ -9,50 +9,59 @@ import matplotlib.pyplot as plt
 # If True, will export png images at key points of the algorithm to the specified dir --for debugging
 EXPORT_FRAME_IMAGES = False
 
-def bandpass_filter(img, xs, xl):
+def bandpass_filter(image, small_cutoff, large_cutoff):
     """
     Apply a bandpass filter to a grayscale image.
 
     Parameters:
     ----------
-    img : np.ndarray
+    image : np.ndarray
         Grayscale image array (2D).
-    xs : float
+    small_cutoff : float
         Small cutoff size (Pixels).
-    xl : float
+    large_cutoff : float
         Large cutoff size (Pixels).
 
     Returns:
     -------
-    img_filt : np.ndarray
+    filtered_image : np.ndarray
         Filtered image.
-    BPP : np.ndarray
+    bandpass_filter_array : np.ndarray
         Bandpass filter array.
     """
-    img_fft = np.fft.fftshift(np.fft.fft2(img))
-    img_amp = abs(img_fft)
+    # Validate input
+    if image.ndim != 2:
+        raise ValueError("Oi Input image should be 2D")
+    if small_cutoff <= 0 or large_cutoff <= 0:
+        raise ValueError("Cutoff sizes must be positive")
 
-    ni, nj = img_amp.shape
-    MIS = ni
+    # Fourier Transform of the image
+    image_fft = np.fft.fftshift(np.fft.fft2(image))
 
-    jj, ii = np.meshgrid(np.arange(nj), np.arange(ni))
+    # Create the frequency domain grid
+    height, width = image.shape
+    center_x, center_y = width / 2, height / 2
+    x_grid, y_grid = np.meshgrid(np.arange(width), np.arange(height))
+    distance_squared = (x_grid - center_x) ** 2 + (y_grid - center_y) ** 2
 
-    LCO = np.exp(-((ii - MIS / 2) ** 2 + (jj - MIS / 2) ** 2) * (2 * xl / MIS) ** 2)
-    SCO = np.exp(-((ii - MIS / 2) ** 2 + (jj - MIS / 2) ** 2) * (2 * xs / MIS) ** 2)
+    # Generate large and small cutoff filters
+    large_cutoff_filter = np.exp(-distance_squared * (2 * large_cutoff / height) ** 2)
+    small_cutoff_filter = np.exp(-distance_squared * (2 * small_cutoff / height) ** 2)
 
-    # BP matches up with LabVIEW
-    # TODO: I changed this from SCO - LCO to match up with LabVIEW - probably wrong?
-    BP = SCO - LCO
+    ### BP matches up with LabVIEW
+    # Create the bandpass filter
+    bandpass_filter = small_cutoff_filter - large_cutoff_filter
+    # bandpass_filter = small_cutoff_filter * (1 - large_cutoff_filter)
 
     # Applies fft shift to normalize BP? Does not match up with LabVIEW anymore
-    BPP = np.fft.ifftshift(BP)
+    bandpass_filter_shifted = np.fft.ifftshift(bandpass_filter)
+
 
     # Filter image - Edit: This is not used anywhere?
-    filtered = BP * img_fft
-    img_filt = np.fft.ifftshift(filtered)
-    img_filt = np.fft.ifft2(img_filt)
+    filtered_fft = bandpass_filter * image_fft
+    filtered_image = np.fft.ifft2(np.fft.ifftshift(filtered_fft)).real
 
-    return img_filt, BPP
+    return filtered_image, bandpass_filter_shifted
 
 
 def videoImport(video, N):
