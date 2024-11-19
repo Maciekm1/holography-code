@@ -4,7 +4,7 @@ from Code.functions import bandpass_filter
 
 
 def test_bandpass_filter_valid_input():
-    # Create a simple grayscale image (2D array)
+    # simple grayscale image (2D array)
     image = np.ones((100, 100))  # Uniform image
     small_cutoff = 5
     large_cutoff = 20
@@ -20,7 +20,7 @@ def test_bandpass_filter_valid_input():
 
 
 def test_bandpass_filter_cutoff_behavior():
-    # Create a simple grayscale image
+    # simple grayscale image
     image = np.ones((100, 100))  # Uniform image
     small_cutoff = 1  # Very small cutoff
     large_cutoff = 50  # Very large cutoff
@@ -28,7 +28,8 @@ def test_bandpass_filter_cutoff_behavior():
     filtered_image, bandpass_filter_array = bandpass_filter(image, small_cutoff, large_cutoff)
 
     # Check that the bandpass filter makes sense:
-    # Large cutoff size should result in less filtering
+    # Large cutoff size should result in less filtering, any wat to test this?
+
     assert np.all(bandpass_filter_array >= 0), "Bandpass filter array should not have negative values"
     assert np.max(bandpass_filter_array) > 0, "Bandpass filter should allow some frequencies to pass"
 
@@ -51,7 +52,7 @@ def test_bandpass_filter_invalid_input():
 
 
 def test_bandpass_filter_edge_cases():
-    # Test with a zero image
+    # zero image
     image = np.zeros((100, 100))
     small_cutoff = 5
     large_cutoff = 20

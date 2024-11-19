@@ -45,7 +45,7 @@ def process_frame_to_csv(frame_path, params_path):
             params["bp_small"],
             params["grad_threshold"],
             params["peak_min_dist"],
-            func.bgPathToArray(params["bg_image_path"]),  # Pass bg_image if needed
+            func.bgPathToArray(params["bg_image_path"]),
             params["use_bg_image"],
         )
     )

@@ -62,5 +62,5 @@ def extract_params_and_frames(spreadsheet_path, row_index):
 
 if __name__ == '__main__':
     spreadsheet_path = sys.argv[1] if len(sys.argv) > 1 else SPREADSHEET_PATH
-    row_index = int(sys.argv[2]) if len(sys.argv) > 2 else 0  # Default to the third row
+    row_index = int(sys.argv[2]) if len(sys.argv) > 2 else 0  # Default to the first row
     extract_params_and_frames(spreadsheet_path, row_index)

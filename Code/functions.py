@@ -607,7 +607,7 @@ def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_part
     plt.title('2D Maximum Projection with Peak Positions')
 
     # Save the plot as a PNG file
-    plt.savefig('2D_max_projection_with_peaks.png', format='png')
+    # plt.savefig('2D_max_projection_with_peaks.png', format='png')
 
     # Clear the plot if you’re creating multiple images in a loop or in sequence
     plt.clf()
