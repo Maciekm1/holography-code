@@ -45,6 +45,8 @@ def extract_params_and_frames(spreadsheet_path, row_index):
     video_name = Path(video_path).stem
     output_folder = Path(f"./{video_name}_frames")
     output_folder.mkdir(exist_ok=True)
+    output_folder_frames = Path(f"./{video_name}_frames/inputs")
+    output_folder_frames.mkdir(exist_ok=True)
 
     # Save parameters as JSON
     json_path = output_folder / "parameters.json"
@@ -56,9 +58,9 @@ def extract_params_and_frames(spreadsheet_path, row_index):
     video_data = func.videoImport(video_path, 0)
 
     for i in range(video_data.shape[0]):
-        frame_path = output_folder / f"frame_{i:05d}.npy"
+        frame_path = output_folder_frames / f"frame_{i:05d}.npy"
         np.save(frame_path, video_data[i])
-    print(f"Frames extracted to {output_folder}")
+    print(f"Frames extracted to {output_folder_frames}")
 
 if __name__ == '__main__':
     spreadsheet_path = sys.argv[1] if len(sys.argv) > 1 else SPREADSHEET_PATH

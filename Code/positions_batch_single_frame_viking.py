@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import csv
 import numpy as np
+from param import output
+
 import functions as func
 
 
@@ -60,7 +62,8 @@ def process_frame_to_csv(frame_path, params_path):
     )
 
     # Output to CSV
-    output_path = Path(frame_path).with_suffix(".csv")
+    output_path = Path(str(frame_path).replace("inputs", "outputs")).with_suffix(".csv")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
         csv_writer.writerow(["X", "Y", "Z", "I_FS", "I_GS"])  # Write header
