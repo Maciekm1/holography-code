@@ -4,7 +4,7 @@ import json
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import Code.functions as func
+import functions as func
 
 SPREADSHEET_PATH = r'C:\Users\mz1794\Downloads\Python and Viking DHM port\CSV\2024-01-24 - part 1 - videos to frames_subset_Maciek.xlsx'
 
@@ -52,7 +52,7 @@ def extract_params_and_frames(spreadsheet_path, row_index):
     json_path = output_folder / "parameters.json"
     with open(json_path, 'w') as f:
         json.dump(parameters, f, indent=4)
-    print(f"Parameters saved to {json_path}")
+    #print(f"Parameters saved to {json_path}")
 
     # Extract frames
     video_data = func.videoImport(video_path, 0)
@@ -60,7 +60,8 @@ def extract_params_and_frames(spreadsheet_path, row_index):
     for i in range(video_data.shape[0]):
         frame_path = output_folder_frames / f"frame_{i:05d}.npy"
         np.save(frame_path, video_data[i])
-    print(f"Frames extracted to {output_folder_frames}")
+    #print(f"Frames extracted to {output_folder_frames}")
+    print(output_folder_frames)
 
 if __name__ == '__main__':
     spreadsheet_path = sys.argv[1] if len(sys.argv) > 1 else SPREADSHEET_PATH
