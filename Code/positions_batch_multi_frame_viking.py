@@ -52,7 +52,6 @@ def main():
     main_processing(video_paths, bg_image_paths, processing_params)
 
 
-# TODO - Rewrite so only processes one frame at a time, and outputs 1 .txt file for that frame.
 def main_processing(video_path, bg_image_path, processing_params):
     # Process each video file that was added
         video_data = func.videoImport(video_path, 0)
@@ -161,7 +160,6 @@ def main_processing(video_path, bg_image_path, processing_params):
 
         print("Done.")
 
-# TODO - Rewrite to create parameter files from spreadsheet.
 def load_params_from_spreadsheet(spreadsheet_path):
     # Load spreadsheet
     data = pd.read_excel(spreadsheet_path, header=1)

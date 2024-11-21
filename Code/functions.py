@@ -293,33 +293,6 @@ def rayleigh_sommerfeld_propagator(
     return reconstructed_stack
 
 
-# NOT USED IF USING BG IMAGE
-def medianImage(VID, num_frames):
-    """
-    Calculate the median image from a 3D numpy array of video frames.
-
-    Parameters:
-    ----------
-    VID : np.ndarray
-        3D numpy array of video file.
-    num_frames : int
-        Number of frames to calculate the median image.
-
-    Returns:
-    -------
-    MEAN : np.ndarray
-        2D pixel mean array.
-    """
-    def spaced_elements(array, num_elems):
-        return array[np.round(np.linspace(0, len(array) - 1, num_elems)).astype(int)]
-
-    N = VID.shape[2]
-    id = spaced_elements(np.arange(N), num_frames)
-    MEAN = np.median(VID[:, :, id], axis=2)
-
-    return MEAN
-
-
 def z_gradient_stack(image):
     """
     Calculate the Z-gradient stack of a 3D image, emphasizing intensity changes along the Z-dimension.
@@ -358,81 +331,6 @@ def z_gradient_stack(image):
             export_frame(gradient_stack[:, :, frame_number], "gradient_stack", frame_number)
 
     return gradient_stack
-
-
-# NOT USED - NOT SURE IF USEFUL?
-def modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, bandpass, med_filter):
-    """
-    Modified Propagator.
-
-    Parameters:
-    ----------
-    I : np.ndarray
-        Hologram (grayscale).
-    I_MEDIAN : np.ndarray
-        Median image.
-    N : float
-        Index of refraction.
-    LAMBDA : float
-        Wavelength.
-    FS : float
-        Sampling Frequency in px/um.
-    SZ : float
-        Step size.
-    NUMSTEPS : int
-        Number of steps in propagation.
-    bandpass : bool
-        Whether to apply bandpass filtering.
-    med_filter : bool
-        Whether to apply median filtering.
-
-    Returns:
-    -------
-    GS : np.ndarray
-        3D Gradient Stack.
-    """
-    # Divide by Median image
-    I_MEDIAN[I_MEDIAN == 0] = np.mean(I_MEDIAN)
-    IN = I / I_MEDIAN
-
-    if med_filter:
-        IN = median_filter(IN, size=1)
-
-    # Bandpass Filter
-    if bandpass:
-        _, BP = bandpass_filter(IN, 2, 30)
-        E = np.fft.fftshift(BP) * np.fft.fftshift(np.fft.fft2(IN - 1))
-    else:
-        E = np.fft.fftshift(np.fft.fft2(IN - 1))
-
-    # Parameters
-    NI, NJ = IN.shape  # Number of rows and columns
-    Z = SZ * np.arange(NUMSTEPS)
-    K = 2 * np.pi * N / LAMBDA  # Wavenumber
-
-    # Rayleigh-Sommerfeld Arrays
-    jj, ii = np.meshgrid(np.arange(NJ), np.arange(NI))
-    const = ((LAMBDA * FS) / (max(NI, NJ) * N)) ** 2
-    q = (ii - NI / 2) ** 2 + (jj - NJ / 2) ** 2
-
-    P = const * q
-
-    if (P > 1).any():
-        P /= P.max()
-
-    P = np.conj(P)
-    Q = np.sqrt(1 - P) - 1
-
-    if all(Z > 0):
-        Q = np.conj(Q)
-
-    GS = np.empty((NI, NJ, Z.shape[0]), dtype='float32')
-
-    for k in range(Z.shape[0]):
-        R = 2 * np.pi * 1j * q * np.exp(1j * K * Z[k] * Q)
-        GS[:, :, k] = np.real(1 + np.fft.ifft2(np.fft.ifftshift(E * R)))
-
-    return GS
 
 
 def positions_batch(params):
@@ -500,68 +398,6 @@ def positions_batch(params):
     intensity_gs.append(locs[0, 2])
 
     return [x_coords, y_coords, z_coords, intensity_fs, intensity_gs]
-
-
-# NOT USED - NOT SURE IF USEFUL?
-def positions_batch_modified(TUPLE):
-    """
-    Process a modified batch of positions from the input tuple.
-
-    Parameters:
-    ----------
-    TUPLE : tuple
-        A tuple containing the following elements:
-        - I (np.ndarray): Hologram.
-        - I_MEDIAN (np.ndarray): Median image.
-        - N (float): Index of refraction.
-        - LAMBDA (float): Wavelength.
-        - MPP (float): Microns per pixel.
-        - SZ (float): Size parameter.
-        - NUMSTEPS (int): Number of steps in propagation.
-        - THRESHOLD (float): Threshold for GS.
-        - PMD (float): Peak minimum distance.
-
-    Returns:
-    -------
-    list
-        A list containing the X, Y, Z positions and intensity arrays (I_FS, I_GS).
-    """
-    I = TUPLE[0]
-    I_MEDIAN = TUPLE[1]
-    N = TUPLE[2]
-    LAMBDA = TUPLE[3]
-    MPP = TUPLE[4]
-    SRV = TUPLE[5]
-    FS = (MPP / 10) * 0.711
-    SZ = TUPLE[6]
-    NUMSTEPS = TUPLE[7]
-    BPL = TUPLE[8]
-    BPS = TUPLE[9]
-    THRESHOLD = TUPLE[10]
-    PMD = TUPLE[11]
-
-    # 0   1    2  3    4    5    6         7
-    # zip(IT, MED, n, lam, mpp, sz, numsteps, pmd)
-
-    LOCS = np.empty((1, 3), dtype=object)
-    X, Y, Z, I_FS, I_GS = [], [], [], [], []
-
-    GS = modified_propagator(I, I_MEDIAN, N, LAMBDA, FS, SZ, NUMSTEPS, True, True)
-    GS[GS < THRESHOLD] = 0
-
-    LOCS[0, 0] = find_3d_positions(GS, PMD, MPP, -1)
-    A = LOCS[0, 0].astype('int')
-
-    LOCS[0, 1] = GS[A[:, 0], A[:, 1], A[:, 2]]
-    LOCS[0, 2] = GS[A[:, 0], A[:, 1], A[:, 2]]
-
-    X.append(LOCS[0, 0][:, 0] * (1 / FS))
-    Y.append(LOCS[0, 0][:, 1] * (1 / FS))
-    Z.append(LOCS[0, 0][:, 2] * SZ)
-    I_FS.append(LOCS[0, 1])
-    I_GS.append(LOCS[0, 2])
-
-    return [X, Y, Z, I_FS, I_GS]
 
 
 def find_3d_positions(gradient_stack, min_peak_distance, magnification, num_particles=160):

@@ -1,4 +1,3 @@
-import os
 import sys
 import json
 import pandas as pd
@@ -6,7 +5,10 @@ import numpy as np
 from pathlib import Path
 import functions as func
 
-SPREADSHEET_PATH = r'C:\Users\mz1794\Downloads\Python and Viking DHM port\CSV\2024-01-24 - part 1 - videos to frames_subset_Maciek.xlsx'
+
+# Default spreadsheet path (if no path specified)
+SPREADSHEET_PATH = r''
+
 
 def extract_params_and_frames(spreadsheet_path, row_index):
     # Load spreadsheet
@@ -62,6 +64,7 @@ def extract_params_and_frames(spreadsheet_path, row_index):
         np.save(frame_path, video_data[i])
     #print(f"Frames extracted to {output_folder_frames}")
     print(output_folder_frames)
+
 
 if __name__ == '__main__':
     spreadsheet_path = sys.argv[1] if len(sys.argv) > 1 else SPREADSHEET_PATH
