@@ -1,5 +1,5 @@
 {
-    "bg_image_path": "C:\\Users\\mz1794\\Downloads\\Python and Viking DHM port\\1024bg.png",
+    "bg_image_path": "/users/mz1794/labVIEW/Code/input_files/1024bg.png",
     "refractive_index": 1.3326,
     "wavelength": 0.642,
     "magnification": 40.0,
