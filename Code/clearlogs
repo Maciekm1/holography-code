@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Check if files exist before removing
+if ls ./logs/*.log 1> /dev/null 2>&1; then
+    rm ./logs/*.log
+    echo 'Logs have been cleared.'
+else
+    echo 'No log files to clear.'
+fi
+
+if ls ./errors/*.err 1> /dev/null 2>&1; then
+    rm ./errors/*.err
+    echo 'Errors have been cleared.'
+else
+    echo 'No error files to clear.'
+fi

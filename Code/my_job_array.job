@@ -7,8 +7,8 @@
 #SBATCH --account=its-system-2018       # Project account to use
 #SBATCH --mail-type=END,FAIL            # Mail events (NONE, BEGIN, END, FAIL, ALL)
 #SBATCH --mail-user=mz1794@york.ac.uk   # Where to send mail
-#SBATCH --output=logs/%a.log              # Standard output log
-#SBATCH --error=errors/%a.err               # Standard error log
+#SBATCH --output=logs/%A_%a.log              # Standard output log
+#SBATCH --error=errors/%A_%a.err               # Standard error log
 #SBATCH --array=0-49
 #SBATCH --requeue
 
