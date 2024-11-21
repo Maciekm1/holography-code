@@ -1,10 +1,8 @@
-import os
 import sys
 import json
 from pathlib import Path
 import csv
 import numpy as np
-from param import output
 
 import functions as func
 
