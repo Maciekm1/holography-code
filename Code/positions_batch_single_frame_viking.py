@@ -7,7 +7,6 @@ import functions as func
 import numpy as np
 
 
-# A python script that takes in a 2D grayscale array and a parameter file and outputs the x, y, z positions for that frame.
 def process_frame_to_csv(frame_path, params_path):
     """
     Process a single frame and save the results as a CSV file.
