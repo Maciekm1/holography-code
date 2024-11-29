@@ -17,12 +17,13 @@ set -e
 
 module purge
 
-module load Python/3.10.4-GCCcore-11.3.0
-module load tqdm/4.64.0-GCCcore-11.3.0
-module load SciPy-bundle/2022.05-foss-2022a
-module load scikit-image/0.19.3-foss-2022a
-module load OpenCV/4.6.0-foss-2022a-contrib
-module load openpyxl/3.0.10-GCCcore-11.3.0
+#module load Python/3.10.4-GCCcore-11.3.0
+#module load tqdm/4.64.0-GCCcore-11.3.0
+#module load SciPy-bundle/2022.05-foss-2022a
+#module load scikit-image/0.19.3-foss-2022a
+#module load OpenCV/4.6.0-foss-2022a-contrib
+#module load openpyxl/3.0.10-GCCcore-11.3.0
+ml restore labVIEWjob
 
 # Variables
 input_dir="./40x_100Hz_1081_1_T5_detrend_frame0-50_frames/inputs"
