@@ -265,9 +265,12 @@ def rayleigh_sommerfeld_propagator(
         _, _bandpass_filter = bandpass_filter(
             normalized_hologram, bandpass_min_px, bandpass_max_px
         )
-        fft_after_decrement = np.fft.fft2(normalized_hologram - 1)
+
+        fft_after_decrement = np.fft.fft2(
+            normalized_hologram - 1
+        )  # <- This 2D array is the same as LabVIEW
         spectrum = np.fft.fftshift(_bandpass_filter) * np.fft.fftshift(
-            fft_after_decrement
+            fft_after_decrement  # <- Diverges from LabVIEW here
         )
         if EXPORT_FRAME_IMAGES:
             export_frame(spectrum, "bandpass_filtered_spectrum", frame_number)
