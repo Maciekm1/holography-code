@@ -106,8 +106,10 @@ def main():
             print(f'Added {os.path.split(values["-VIDEO-"])[-1]} to queue.')
 
             # --- TEMP FOR DEBUGGING
+            # Uncomment the two lines below to be able to select them with the UI
             # paths.append(values['-FILE-'])
             # bg_paths.append(values['-BGIMAGE-'])
+            # If you uncommented the lines above, comment out the two lines below
             video_paths.append(
                 "C:/Users/mz1794/Downloads/Python and Viking DHM port/40x_100Hz_1081_CHO_1_T5_detrend_frame0-50.avi"
             )
