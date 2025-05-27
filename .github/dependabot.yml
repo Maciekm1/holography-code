@@ -10,3 +10,4 @@ updates:
   schedule:
     interval: daily
     time: "13:00"
+  target-branch: "main-Viking"
