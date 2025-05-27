@@ -10,7 +10,3 @@ updates:
     schedule:
       interval: daily
       time: "14:00"
-    groups:
-      python-packages:
-        patterns:
-          - "*"
