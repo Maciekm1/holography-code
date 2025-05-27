@@ -6,7 +6,7 @@
 version: 2
 updates:
 - package-ecosystem: pip
-  directory: "/"
+  directory: "/holography-code/"
   schedule:
     interval: daily
     time: "13:00"
